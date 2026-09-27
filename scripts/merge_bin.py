@@ -63,12 +63,18 @@ def merge_bin_action(source, target, env):
     cmd_args.extend([app_offset, target_firmware])
 
     print(f"[Web Flasher] Generating merged binary for {env_name} ({mcu})...")
-    try:
-        from esptool import main as esptool_main
-        esptool_main(cmd_args)
+    import subprocess
+    cmd = ["esptool"] + cmd_args
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode == 0:
         print(f"[Web Flasher] SUCCESS! Merged binary created: {output_bin}")
-    except Exception as e:
-        print(f"[Web Flasher] Note: automatic esptool merge skipped ({e}). Copying firmware.bin directly.")
-        shutil.copyfile(target_firmware, os.path.join(out_dir, f"{env_name}_firmware.bin"))
+    else:
+        # Fallback to esptool.py
+        res2 = subprocess.run(["esptool.py"] + cmd_args, capture_output=True, text=True)
+        if res2.returncode == 0:
+            print(f"[Web Flasher] SUCCESS! Merged binary created: {output_bin}")
+        else:
+            print(f"[Web Flasher] esptool merge note: {res.stderr or res2.stderr}. Copying firmware.bin directly.")
+            shutil.copyfile(target_firmware, os.path.join(out_dir, f"{env_name}_firmware.bin"))
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", merge_bin_action)

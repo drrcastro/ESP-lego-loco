@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Modular Lego Train Framework (ESP-lego-loco V2.0)
 
 A high-performance, modular, object-oriented C++ framework for controlling Lego model trains and track layout infrastructure using **ESP32**, **ESP32-S3**, **ESP32-C3**, and **ESP8266**.
@@ -245,7 +244,3 @@ The Master Gateway hosts a **100% mobile-friendly, touch-optimized web applicati
 
 > [!TIP]
 > **Zero Configuration Fallback:** The Master firmware includes an embedded mobile-friendly controller inside PROGMEM flash. Even if you flash only `master_merged.bin` via `http://esptool.spacehuhn.com/` without separately uploading the LittleFS data files, the web controller is immediately operational!
-
-=======
-place holder
->>>>>>> 78aa9084337e2e3ac6a5ab44d8790fb9d93393ca

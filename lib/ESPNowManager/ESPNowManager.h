@@ -73,6 +73,10 @@ public:
     const uint8_t* getMasterMac() const { return _masterMac; }
     bool hasMasterMac() const { return _hasMasterMac; }
 
+    // Internal low-level static callbacks invoked by platform layer
+    static void handleEspNowRecv(const uint8_t *mac, const uint8_t *data, int len);
+    static void handleEspNowSend(const uint8_t *mac, uint8_t status);
+
 private:
     ESPNowManager();
     ~ESPNowManager() = default;
@@ -92,8 +96,5 @@ private:
     uint32_t _lastCleanupMs = 0;
 
     void generateNodeId();
-
-    // Internal low-level static callbacks
-    static void handleEspNowRecv(const uint8_t *mac, const uint8_t *data, int len);
-    static void handleEspNowSend(const uint8_t *mac, uint8_t status);
 };
+

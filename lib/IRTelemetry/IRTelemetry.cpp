@@ -2,7 +2,6 @@
 
 // Define IRremote configuration macros before including library headers
 #if defined(ESP32)
-  #define DISABLE_CODE_FOR_RECEIVER // Optional optimization
   #include <IRremote.hpp>
 #elif defined(ESP8266)
   #include <IRremoteESP8266.h>

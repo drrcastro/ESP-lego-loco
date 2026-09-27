@@ -53,10 +53,9 @@ private:
     uint8_t _pwmResolution = 8;
     uint32_t _maxDuty = 255;
 
-#if defined(ESP32)
     int _pwmChannelA = 0;
     int _pwmChannelB = 1;
-#endif
+
 
     int8_t  _targetSpeed = 0;      // -100 to 100
     float   _currentSpeed = 0.0f;  // -100.0 to 100.0
