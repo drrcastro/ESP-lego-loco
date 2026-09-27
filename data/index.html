@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#090d16">
+  <title>Lego Loco Control Center V2.0</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-badge">
+          <svg class="train-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="3" width="16" height="16" rx="2"></rect>
+            <path d="M4 11h16"></path>
+            <path d="M12 3v8"></path>
+            <path d="m8 19-2 3"></path>
+            <path d="m16 19 2 3"></path>
+            <circle cx="8" cy="15" r="1"></circle>
+            <circle cx="16" cy="15" r="1"></circle>
+          </svg>
+          <div>
+            <h1>LEGO LOCO <span>V2.0</span></h1>
+            <p class="subtitle">MODULAR DISPATCH &amp; TRAIN CONTROL</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="mode-selector">
+          <button id="btnModeManual" class="mode-btn active" onclick="setSystemMode('MANUAL')">
+            <span class="dot"></span> MANUAL
+          </button>
+          <button id="btnModeAuto" class="mode-btn" onclick="setSystemMode('AUTOMATIC')">
+            <span class="dot"></span> AUTOMATIC
+          </button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="ws-status" id="wsStatus">
+          <span class="status-indicator pulse-offline" id="wsIndicator"></span>
+          <span id="wsStatusText">CONNECTING</span>
+        </div>
+        <button id="btnEmergencyStop" class="btn-emergency" onclick="triggerEmergencyStop()" title="Emergency Stop All Trains">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>E-STOP</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mobile Quick Bar -->
+    <div class="mobile-quick-ribbon">
+      <div class="mode-selector-mobile">
+        <button class="mode-btn-mobile active" id="mBtnManual" onclick="setSystemMode('MANUAL')">MANUAL</button>
+        <button class="mode-btn-mobile" id="mBtnAuto" onclick="setSystemMode('AUTOMATIC')">AUTO</button>
+      </div>
+      <button class="btn-emergency-mobile" onclick="triggerEmergencyStop()">
+        🛑 STOP ALL
+      </button>
+    </div>
+
+    <!-- System Stats Ribbon -->
+    <div class="stats-ribbon">
+      <div class="stat-card">
+        <span class="stat-label">Active Locomotives</span>
+        <span class="stat-value" id="statLocoCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Track Infrastructure</span>
+        <span class="stat-value" id="statTrackCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Active Scenario</span>
+        <span class="stat-value text-accent" id="statActiveScenario">None</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">System Uptime</span>
+        <span class="stat-value" id="statUptime">00:00:00</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs (Desktop & Tablet) -->
+    <nav class="nav-tabs" id="desktopNavTabs">
+      <button class="nav-tab active" data-tab="tabLocos" onclick="switchTab('tabLocos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="16" rx="2"></rect><line x1="4" y1="11" x2="20" y2="11"></line></svg>
+        Locomotives
+      </button>
+      <button class="nav-tab" data-tab="tabTrack" onclick="switchTab('tabTrack')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v18"></path><path d="M18 3v18"></path><path d="m6 8 12 8"></path><path d="M3 5h6"></path><path d="M15 5h6"></path><path d="M3 19h6"></path><path d="M15 19h6"></path></svg>
+        Track &amp; Stations
+      </button>
+      <button class="nav-tab" data-tab="tabScenarios" onclick="switchTab('tabScenarios')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+        Scenario Manager (CSV)
+      </button>
+      <button class="nav-tab" data-tab="tabNodes" onclick="switchTab('tabNodes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        Fleet Discovery
+      </button>
+      <button class="nav-tab" data-tab="tabLogs" onclick="switchTab('tabLogs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        Event Telemetry
+      </button>
+    </nav>
+
+    <!-- TAB 1: LOCOMOTIVES -->
+    <main id="tabLocos" class="tab-content active">
+      <div class="section-header">
+        <h2>Train Fleet Control</h2>
+        <span class="badge">Real-time Throttle &amp; Lights</span>
+      </div>
+      <div id="locoGrid" class="cards-grid">
+        <div class="empty-state" id="locoEmptyState">
+          <p>Scanning for locomotives via ESP-NOW broadcast...</p>
+          <span class="hint">Ensure train nodes are powered on. Node ID will appear automatically.</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 2: TRACK & STATIONS -->
+    <section id="tabTrack" class="tab-content">
+      <div class="section-header">
+        <h2>Track Switches &amp; Station Infrastructure</h2>
+        <span class="badge">Servos, IR Beams &amp; Dwell Timers</span>
+      </div>
+      <div id="trackGrid" class="cards-grid">
+        <div class="empty-state" id="trackEmptyState">
+          <p>Scanning for track nodes &amp; stations...</p>
+          <span class="hint">Track nodes announce via ESP-NOW on power-up.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: SCENARIO MANAGER (CSV) -->
+    <section id="tabScenarios" class="tab-content">
+      <div class="scenario-layout">
+        <!-- Sidebar: Scenario Files -->
+        <div class="scenario-sidebar panel">
+          <div class="panel-header">
+            <h3>Scenarios</h3>
+            <button class="btn btn-sm btn-primary" onclick="createNewScenario()">+ New</button>
+          </div>
+          <ul id="scenarioFileList" class="file-list">
+            <!-- Populated via API -->
+          </ul>
+          <div class="scenario-actions">
+            <button id="btnRunScenario" class="btn btn-success btn-block" onclick="runCurrentScenario()">
+              ▶ Run Scenario
+            </button>
+            <button id="btnStopScenario" class="btn btn-danger btn-block" onclick="stopCurrentScenario()">
+              ⏹ Stop
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Scenario Editor -->
+        <div class="scenario-editor-panel panel">
+          <div class="panel-header">
+            <div class="scenario-title-area">
+              <span class="label">FILE:</span>
+              <input type="text" id="scenarioFileName" value="default.csv" class="input-inline">
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-secondary btn-sm" onclick="toggleCsvViewMode()" id="btnToggleCsvMode">
+                Switch to Raw CSV
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="exportScenarioCsv()">
+                Export .CSV
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="saveScenarioToServer()">
+                💾 Save to Master
+              </button>
+            </div>
+          </div>
+
+          <!-- Visual Table View -->
+          <div id="scenarioTableView" class="table-container">
+            <table class="data-table" id="scenarioTable">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">Step</th>
+                  <th>Trigger Type</th>
+                  <th>Trigger Value</th>
+                  <th>Target Node</th>
+                  <th>Action</th>
+                  <th>Parameter</th>
+                  <th style="width: 90px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="scenarioTableBody">
+                <!-- Dynamically populated rows -->
+              </tbody>
+            </table>
+            <div class="table-footer">
+              <button class="btn btn-outline btn-sm" onclick="addScenarioStep()">+ Add Step</button>
+            </div>
+          </div>
+
+          <!-- Raw Monospace CSV Editor View -->
+          <div id="scenarioRawView" class="raw-editor-container" style="display: none;">
+            <textarea id="scenarioRawText" class="csv-textarea" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: FLEET DISCOVERY & TOPOLOGY -->
+    <section id="tabNodes" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Discovered Node Topology (ESP-NOW)</h2>
+          <button class="btn btn-secondary btn-sm" onclick="refreshNodesList()">🔄 Refresh</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Node ID</th>
+                <th>Custom Name</th>
+                <th>Role</th>
+                <th>Signal (RSSI)</th>
+                <th>State / Telemetry</th>
+                <th>Last Seen</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="nodeTableBody">
+              <!-- Populated via API -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: TELEMETRY LOGS -->
+    <section id="tabLogs" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Live Protocol &amp; Event Stream</h2>
+          <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Clear Console</button>
+        </div>
+        <div class="console-box" id="eventLogConsole">
+          <div class="log-line system">[SYSTEM] Web UI initialized. Awaiting WebSocket link...</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bottom Navigation Bar for Mobile Phones -->
+  <nav class="bottom-nav-mobile">
+    <button class="bottom-nav-item active" data-tab="tabLocos" onclick="switchTab('tabLocos')">
+      <span class="icon">🚂</span>
+      <span class="label">Locos</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabTrack" onclick="switchTab('tabTrack')">
+      <span class="icon">🔀</span>
+      <span class="label">Switches</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabScenarios" onclick="switchTab('tabScenarios')">
+      <span class="icon">📜</span>
+      <span class="label">Scenarios</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabNodes" onclick="switchTab('tabNodes')">
+      <span class="icon">🛰️</span>
+      <span class="label">Fleet</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabLogs" onclick="switchTab('tabLogs')">
+      <span class="icon">📋</span>
+      <span class="label">Logs</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>

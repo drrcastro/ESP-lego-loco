@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP Lego Loco - Web Firmware Flasher</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- ESP Web Tools Web Component (Espressif / Nabu Casa Standard) -->
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</head>
+<body>
+  <div class="flasher-app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="3" width="16" height="16" rx="2"></rect>
+              <line x1="4" y1="11" x2="20" y2="11"></line>
+              <circle cx="8" cy="15" r="1.5"></circle>
+              <circle cx="16" cy="15" r="1.5"></circle>
+            </svg>
+          </div>
+          <div>
+            <h1>ESP LEGO LOCO <span>WEB FLASHER</span></h1>
+            <p class="subtitle">Direct Browser Firmware Installation via Web Serial API</p>
+          </div>
+        </div>
+        <div class="browser-badge" id="browserCompatBadge">
+          <span class="dot-online"></span>
+          <span>Web Serial Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Info Banner -->
+    <div class="info-banner">
+      <div class="info-icon">⚡</div>
+      <div class="info-text">
+        <strong>Direct USB Programming:</strong> Connect your ESP board to your computer via USB (Chrome, Edge, or Opera required). Choose your firmware profile below and click <strong>Flash Firmware</strong>. No IDE, Python, or command line required!
+      </div>
+    </div>
+
+    <!-- 3 Firmware Profile Cards -->
+    <div class="section-title">
+      <h2>Select Firmware Profile (3 Core Targets)</h2>
+      <span class="badge">Multi-Chip Compatibility (ESP32 / S3 / C3 / 8266)</span>
+    </div>
+
+    <div class="profiles-grid">
+      <!-- Profile 1: Master -->
+      <div class="profile-card" id="cardMaster">
+        <div class="card-badge master-badge">PROFILE 1</div>
+        <div class="card-icon">👑</div>
+        <h3>Master Gateway &amp; Brain</h3>
+        <p class="card-desc">Wi-Fi Gateway (AP/STA), Async Web Server, WebSockets, LittleFS CSV Scenario Engine, and ESP-NOW Traffic Coordinator.</p>
+        
+        <div class="chip-compatibility">
+          <span class="chip-tag esp32">ESP32</span>
+          <span class="chip-tag esp32s3">ESP32-S3</span>
+        </div>
+
+        <ul class="features-list">
+          <li>✓ Web UI &amp; CSV Scenario Studio</li>
+          <li>✓ Collision Avoidance &amp; Station ETAs</li>
+          <li>✓ Fleet Auto-Discovery Coordinator</li>
+        </ul>
+
+        <div class="install-action">
+          <esp-web-install-button manifest="manifest_master.json">
+            <button slot="activate" class="btn btn-primary btn-block">⚡ Flash Master Gateway</button>
+            <span slot="unsupported">Web Serial is not supported in this browser. Please use Chrome or Edge.</span>
+            <span slot="not-allowed">Web Serial is not allowed in this context.</span>
+          </esp-web-install-button>
+          <button class="btn btn-secondary btn-block btn-sm" onclick="selectProfileForAdvanced('master')">Advanced Flasher &amp; Monitor</button>
+        </div>
+      </div>
+
+      <!-- Profile 2: Loco -->
+      <div class="profile-card" id="cardLoco">
+        <div class="card-badge loco-badge">PROFILE 2</div>
+        <div class="card-icon">🚂</div>
+        <h3>Locomotive Mobile Node</h3>
+        <p class="card-desc">Low-latency traction with L9110 motor driver PWM ramping, 3 independent LED zones (Front/Rear/Cab), and IR beacon localization.</p>
+        
+        <div class="chip-compatibility">
+          <span class="chip-tag esp32c3">ESP32-C3</span>
+          <span class="chip-tag esp8266">ESP8266 (D1 Mini)</span>
+          <span class="chip-tag esp32">ESP32</span>
+        </div>
+
+        <ul class="features-list">
+          <li>✓ L9110 PWM Motor Driver + Active Brake</li>
+          <li>✓ 3 LED Zones (Auto Directional Lighting)</li>
+          <li>✓ IR Receiver for Track Beacon Localization</li>
+          <li>✓ Failsafe Safety Watchdog (Auto-stop)</li>
+        </ul>
+
+        <div class="install-action">
+          <esp-web-install-button manifest="manifest_loco.json">
+            <button slot="activate" class="btn btn-primary btn-block">⚡ Flash Locomotive</button>
+            <span slot="unsupported">Web Serial is not supported in this browser.</span>
+          </esp-web-install-button>
+          <button class="btn btn-secondary btn-block btn-sm" onclick="selectProfileForAdvanced('loco')">Advanced Flasher &amp; Monitor</button>
+        </div>
+      </div>
+
+      <!-- Profile 3: Station -->
+      <div class="profile-card" id="cardStation">
+        <div class="card-badge station-badge">PROFILE 3</div>
+        <div class="card-icon">🚉</div>
+        <h3>Track Switch &amp; Station</h3>
+        <p class="card-desc">Servo turnout switch control, 38kHz IR beacon transmitter &amp; beam-break occupancy sensor, and 0.96'' OLED timetable display.</p>
+        
+        <div class="chip-compatibility">
+          <span class="chip-tag esp32">ESP32</span>
+          <span class="chip-tag esp8266">ESP8266 (D1 Mini)</span>
+        </div>
+
+        <ul class="features-list">
+          <li>✓ Smooth Servo Track Turnout (Agulha)</li>
+          <li>✓ 38kHz IR Beacon TX &amp; Beam-Break RX</li>
+          <li>✓ 0.96'' OLED (SSD1306) Station ETA Board</li>
+          <li>✓ Automated Station Dwell Timer Logic</li>
+        </ul>
+
+        <div class="install-action">
+          <esp-web-install-button manifest="manifest_station.json">
+            <button slot="activate" class="btn btn-primary btn-block">⚡ Flash Track &amp; Station</button>
+            <span slot="unsupported">Web Serial is not supported in this browser.</span>
+          </esp-web-install-button>
+          <button class="btn btn-secondary btn-block btn-sm" onclick="selectProfileForAdvanced('track')">Advanced Flasher &amp; Monitor</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Web Serial Flasher & Terminal Monitor -->
+    <div class="advanced-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Advanced Web Serial Flasher &amp; Live Monitor</h2>
+          <p class="panel-sub">Custom binary flashing, memory erase, and real-time serial logs</p>
+        </div>
+        <div class="port-controls">
+          <button id="btnConnectSerial" class="btn btn-outline" onclick="toggleSerialConnection()">
+            🔌 Connect USB Port
+          </button>
+          <button id="btnResetEsp" class="btn btn-outline" onclick="resetEspChip()" disabled>
+            🔄 Reset Board
+          </button>
+        </div>
+      </div>
+
+      <div class="advanced-grid">
+        <!-- Configuration Side -->
+        <div class="config-side">
+          <div class="form-group">
+            <label>Selected Firmware Binary</label>
+            <select id="selectFirmwareBinary" class="form-select" onchange="onFirmwareSelectionChanged()">
+              <optgroup label="Master Gateway">
+                <option value="binaries/master_merged.bin">Master (ESP32) - binaries/master_merged.bin</option>
+                <option value="binaries/master_s3_merged.bin">Master (ESP32-S3) - binaries/master_s3_merged.bin</option>
+              </optgroup>
+              <optgroup label="Locomotive">
+                <option value="binaries/loco_c3_merged.bin">Loco (ESP32-C3) - binaries/loco_c3_merged.bin</option>
+                <option value="binaries/loco_esp8266_merged.bin">Loco (ESP8266 D1 Mini) - binaries/loco_esp8266_merged.bin</option>
+                <option value="binaries/loco_esp32_merged.bin">Loco (ESP32) - binaries/loco_esp32_merged.bin</option>
+              </optgroup>
+              <optgroup label="Track &amp; Station">
+                <option value="binaries/track_merged.bin">Track (ESP32) - binaries/track_merged.bin</option>
+                <option value="binaries/track_esp8266_merged.bin">Track (ESP8266 D1 Mini) - binaries/track_esp8266_merged.bin</option>
+              </optgroup>
+              <option value="custom">Upload Custom Local .bin File...</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="customFileGroup" style="display: none;">
+            <label>Upload .bin File</label>
+            <input type="file" id="inputCustomBin" accept=".bin" class="form-file">
+          </div>
+
+          <div class="form-group">
+            <label>Flash Offset</label>
+            <input type="text" id="inputFlashOffset" value="0x0000" class="form-input" placeholder="0x0000">
+            <span class="field-hint">Merged binaries start at 0x0000</span>
+          </div>
+
+          <div class="form-group">
+            <label>Baud Rate</label>
+            <select id="selectBaudRate" class="form-select">
+              <option value="921600" selected>921,600 (High Speed)</option>
+              <option value="460800">460,800 (Fast)</option>
+              <option value="115200">115,200 (Safe)</option>
+            </select>
+          </div>
+
+          <div class="form-check">
+            <label>
+              <input type="checkbox" id="checkEraseFlash">
+              Erase all flash before writing (Recommended for clean installs)
+            </label>
+          </div>
+
+          <div class="flash-actions">
+            <button id="btnFlashAdvanced" class="btn btn-primary btn-block" onclick="startAdvancedFlashing()" disabled>
+              ⚡ Flash Selected Binary
+            </button>
+          </div>
+
+          <div class="progress-box" id="progressContainer" style="display: none;">
+            <div class="progress-label">
+              <span id="progressStatus">Flashing...</span>
+              <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Serial Terminal Side -->
+        <div class="terminal-side">
+          <div class="terminal-header">
+            <span>SERIAL MONITOR (115200 BAUD)</span>
+            <div class="terminal-buttons">
+              <button class="btn btn-sm btn-outline" onclick="clearTerminal()">Clear</button>
+              <button class="btn btn-sm btn-outline" onclick="downloadLogs()">Save Log</button>
+            </div>
+          </div>
+          <div class="terminal-window" id="serialTerminal">
+            <div class="term-line system">[SYSTEM] Web Serial flasher ready. Connect a board to start.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="flasher.js"></script>
+</body>
+</html>

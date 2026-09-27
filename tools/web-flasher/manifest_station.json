@@ -1,0 +1,19 @@
+{
+  "name": "ESP Lego Loco - Track & Station Node V2.0",
+  "version": "2.0.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "binaries/track_merged.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP8266",
+      "parts": [
+        { "path": "binaries/track_esp8266_merged.bin", "offset": 0 }
+      ]
+    }
+  ]
+}
