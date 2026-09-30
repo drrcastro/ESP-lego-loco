@@ -73,13 +73,20 @@ static void sendTelemetry() {
     telem.batteryMv = readBatteryMv();
     telem.timestampMs = millis();
 
+    const char* destDesc = "Broadcast";
     if (g_bond.isPaired == 1) {
         ESPNowManager::instance().sendUnicast(g_bond.masterMac, &telem, sizeof(telem));
+        destDesc = "Bonded Master";
     } else if (ESPNowManager::instance().hasMasterMac()) {
         ESPNowManager::instance().sendUnicast(ESPNowManager::instance().getMasterMac(), &telem, sizeof(telem));
+        destDesc = "Master";
     } else {
         ESPNowManager::instance().sendBroadcast(&telem, sizeof(telem));
     }
+
+    const char* dirStr = (telem.direction == 1 ? "FWD" : (telem.direction == 2 ? "REV" : "STOP"));
+    Serial.printf("[Loco TX -> %s] Telemetry: Spd=%d%%, Dir=%s, Block=#%u, Bat=%umV\n",
+                  destDesc, telem.currentSpeed, dirStr, telem.currentBlockId, telem.batteryMv);
 }
 
 static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int len) {
@@ -91,9 +98,15 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     // 1. Handle Pairing Confirmation from Master
     if (msgType == MSG_PAIR_CONFIRM && len >= (int)sizeof(MsgPairConfirm)) {
         const MsgPairConfirm* pairCmd = (const MsgPairConfirm*)data;
+        Serial.printf("[Loco RX <- %02X:%02X:%02X:%02X:%02X:%02X] MSG_PAIR_CONFIRM: Target='%s', Ch=%u\n",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                      pairCmd->targetNodeId, pairCmd->wifiChannel);
+
         if (strcmp(pairCmd->targetNodeId, myId) == 0 || strcmp(pairCmd->targetNodeId, "ALL") == 0) {
             if (g_bond.isPaired == 1 && memcmp(g_bond.masterMac, pairCmd->masterMac, 6) != 0) {
-                Serial.println(F("[Loco] Pairing REJECTED: Locomotive is already bonded to another Master!"));
+                Serial.printf("[Loco RX] Pairing REJECTED: Already bonded to Master %02X:%02X:%02X:%02X:%02X:%02X!\n",
+                              g_bond.masterMac[0], g_bond.masterMac[1], g_bond.masterMac[2],
+                              g_bond.masterMac[3], g_bond.masterMac[4], g_bond.masterMac[5]);
                 return;
             }
 
@@ -130,12 +143,17 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     if (g_bond.isPaired == 1) {
         if (memcmp(mac, g_bond.masterMac, 6) != 0) {
             // Command is from an unauthorized transmitter or adjacent layout. Discard!
+            Serial.printf("[Loco RX] REJECTED packet from unauthorized MAC %02X:%02X:%02X:%02X:%02X:%02X (bonded to %02X:%02X:%02X:%02X:%02X:%02X)\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                          g_bond.masterMac[0], g_bond.masterMac[1], g_bond.masterMac[2],
+                          g_bond.masterMac[3], g_bond.masterMac[4], g_bond.masterMac[5]);
             return;
         }
     } else {
         // If UNPAIRED, locomotive does not drive until paired with Master
         if (msgType == MSG_LOCO_COMMAND) {
-            Serial.println(F("[Loco] Command ignored: Locomotive is UNPAIRED. Please pair with Master via Web UI."));
+            Serial.printf("[Loco RX] REJECTED MSG_LOCO_COMMAND from %02X:%02X:%02X:%02X:%02X:%02X: Locomotive is UNPAIRED. Pair via Web UI.\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             return;
         }
     }
@@ -144,6 +162,10 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     if (msgType == MSG_LOCO_COMMAND && len >= (int)sizeof(MsgLocoCommand)) {
         const MsgLocoCommand* cmd = (const MsgLocoCommand*)data;
         if (strcmp(cmd->targetNodeId, myId) == 0 || strcmp(cmd->targetNodeId, "ALL") == 0) {
+            Serial.printf("[Loco RX <- Master] MSG_LOCO_COMMAND: Target=%s, Spd=%d%%, Brake=%u, Lights=%u (F:%u R:%u Cab:%u)\n",
+                          cmd->targetNodeId, cmd->targetSpeed, cmd->brake, cmd->lightingMode,
+                          cmd->lightsFront, cmd->lightsRear, cmd->lightsCab);
+
             if (cmd->brake == 2) {
                 g_motor.emergencyStop();
             } else if (cmd->brake == 1) {
@@ -163,9 +185,10 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
             g_motor.feedWatchdog();
         }
     } else if (msgType == MSG_EMERGENCY_STOP) {
+        Serial.printf("[Loco RX <- Master] MSG_EMERGENCY_STOP from %02X:%02X:%02X:%02X:%02X:%02X -> Emergency Stop Activated!\n",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         g_motor.emergencyStop();
         g_lights.setMode(LIGHT_MODE_EMERGENCY_FLASH);
-        Serial.println(F("[Loco] Emergency stop command received!"));
     }
 }
 
@@ -191,7 +214,7 @@ void setup() {
     g_ir.beginReceiver(PIN_IR_RX);
     g_ir.onBeaconDetected([](uint16_t blockId) {
         g_currentBlockId = blockId;
-        Serial.printf("[Loco] Entered Track Block #%u\n", blockId);
+        Serial.printf("[Loco RX-IR] Track Beacon Detected: Block #%u -> Triggering immediate telemetry\n", blockId);
         sendTelemetry();
     });
 

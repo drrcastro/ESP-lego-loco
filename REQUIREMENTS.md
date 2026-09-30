@@ -79,6 +79,10 @@ The ecosystem is partitioned into 3 functional profiles with dedicated firmware 
 - **Localization:**
   - Downward-facing 38kHz IR receiver (TSOP38238 or compatible). Decodes block beacon IDs transmitted by track beacons and immediately reports block telemetry to the Master.
 - **Battery Telemetry:** Analog LiPo battery voltage sensing with periodic reporting in millivolts.
+- **Serial Ecosystem Diagnostics & Telemetry Logging (115200 Baud):**
+  - **TX Logs:** Periodic telemetry reporting (`[Loco TX -> Bonded Master] Telemetry: Spd=X%, Dir=..., Block=#..., Bat=...mV`), presence announcements, and discovery replies.
+  - **RX Logs:** Decoded incoming commands (`[Loco RX <- Master] MSG_LOCO_COMMAND: Target=..., Spd=..., Brake=..., Lights=...`), emergency stops, and track beacon events (`[Loco RX-IR] Track Beacon Detected: Block #...`).
+  - **Security Logs:** Explicit warnings when commands are rejected due to unpaired status or unauthorized transmitter MAC addresses.
 
 ### 2.3. Track & Station (Fixed Infrastructure - ESP32 or ESP8266)
 - **Localization & Occupancy Beacons (IR):**
@@ -92,6 +96,10 @@ The ecosystem is partitioned into 3 functional profiles with dedicated firmware 
   - Displays: Station Name, Expected Train, ETA Countdown in `mm:ss`, Track Occupancy status, and 3-aspect visual railway signal (Green, Yellow, Red).
 - **Station Dwell Logic:**
   - Autonomous execution of scheduled station stops (*Dwell Time*) with visual on-screen countdown and departure notification.
+- **Serial Ecosystem Diagnostics & Event Logging (115200 Baud):**
+  - **TX Logs:** Periodic telemetry reporting (`[Track TX -> Bonded Master] Telemetry: Switch=..., Beam=..., BeaconCode=#...`) and dwell completion notifications.
+  - **RX Logs:** Incoming switch commands (`[Track RX <- Master] MSG_TRACK_COMMAND: Target=..., Switch=..., DwellTime=...`), station ETA broadcasts with signal aspect, and pairing confirmations.
+  - **Event Logs:** Real-time logging of physical switch servo transitions and IR beam-break occupancy state changes.
 
 ---
 
@@ -151,6 +159,20 @@ To unpair a locomotive or station and transfer it to a different Master Gateway:
 
 ### 3.6. Custom Friendly Name Mapping
 - The Master persists custom user-defined names in `/config/nodes.json` (e.g., `LOCO_4B5C` -> *"Orient Express"*, `TRACK_1A2B` -> *"Central Station - Platform 1"*). Names can be edited at any time in the Web UI.
+
+### 3.7. Live Serial Diagnostics and Protocol Transparency
+To support live system monitoring, debugging, and verification via the Web Flasher terminal monitor or USB serial consoles (at 115200 baud), all nodes must format their standard I/O traffic with standardized tags:
+- **Outgoing Transmissions (`[Node TX -> Destination]`):**
+  - Identifies destination (`Bonded Master`, `Master`, or `Broadcast`).
+  - Summarizes key telemetry metrics (Speed, Direction, Block ID, Battery, Switch, Beam Break).
+- **Incoming Commands (`[Node RX <- Source]`):**
+  - Displays transmitter MAC address, command type, target ID, and decoded parameters.
+  - Decodes emergency stops and safety overrides immediately.
+- **Physical Events (`[Node Event]` / `[Node RX-IR]`):**
+  - Logs track beacon detections (`Track Beacon Detected: Block #X`).
+  - Logs IR beam interruptions and restoration in real time.
+- **Security & Rejection Traces (`[Node RX]`):**
+  - Logs packets rejected due to unpaired status or unauthorized transmitter MACs, aiding in troubleshooting multi-layout isolation.
 
 ---
 

@@ -189,6 +189,8 @@ void ESPNowManager::announcePresence() {
     }
 
     sendBroadcast(&msg, sizeof(msg));
+    Serial.printf("[ESP-NOW TX -> Broadcast] Announce Presence: ID=%s, Role=%d, Paired=%d\n",
+                  _nodeId, (int)_role, (int)_isPaired);
 }
 
 void ESPNowManager::sendDiscoveryScan() {
@@ -382,6 +384,8 @@ void ESPNowManager::handleEspNowRecv(const uint8_t *mac, const uint8_t *data, in
         instance().updateNodeHeartbeat(hb->nodeId, hb->rssi);
     } else if (msgType == MSG_DISCOVERY_SCAN && len >= (int)sizeof(MsgDiscoveryScan)) {
         if (instance()._role != NODE_TYPE_MASTER) {
+            Serial.printf("[ESP-NOW RX <- %02X:%02X:%02X:%02X:%02X:%02X] Discovery Scan -> Emitting Announcement\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             instance().announcePresence();
         }
     }

@@ -52,13 +52,22 @@ static void sendTrackTelemetry() {
     telem.beaconCodeEmitted = g_blockBeaconId;
     telem.timestampMs = millis();
 
+    const char* destDesc = "Broadcast";
     if (g_bond.isPaired == 1) {
         ESPNowManager::instance().sendUnicast(g_bond.masterMac, &telem, sizeof(telem));
+        destDesc = "Bonded Master";
     } else if (ESPNowManager::instance().hasMasterMac()) {
         ESPNowManager::instance().sendUnicast(ESPNowManager::instance().getMasterMac(), &telem, sizeof(telem));
+        destDesc = "Master";
     } else {
         ESPNowManager::instance().sendBroadcast(&telem, sizeof(telem));
     }
+
+    Serial.printf("[Track TX -> %s] Telemetry: Switch=%s, Beam=%s, BeaconCode=#%u\n",
+                  destDesc,
+                  telem.switchPosition == 0 ? "STRAIGHT" : "TURNOUT",
+                  telem.beamOccupied ? "OCCUPIED" : "CLEAR",
+                  telem.beaconCodeEmitted);
 }
 
 static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int len) {
@@ -70,9 +79,15 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     // 1. Handle Pairing Confirmation from Master
     if (msgType == MSG_PAIR_CONFIRM && len >= (int)sizeof(MsgPairConfirm)) {
         const MsgPairConfirm* pairCmd = (const MsgPairConfirm*)data;
+        Serial.printf("[Track RX <- %02X:%02X:%02X:%02X:%02X:%02X] MSG_PAIR_CONFIRM: Target='%s', Ch=%u\n",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                      pairCmd->targetNodeId, pairCmd->wifiChannel);
+
         if (strcmp(pairCmd->targetNodeId, myId) == 0 || strcmp(pairCmd->targetNodeId, "ALL") == 0) {
             if (g_bond.isPaired == 1 && memcmp(g_bond.masterMac, pairCmd->masterMac, 6) != 0) {
-                Serial.println(F("[Track] Pairing REJECTED: Station is already bonded to another Master!"));
+                Serial.printf("[Track RX] Pairing REJECTED: Already bonded to Master %02X:%02X:%02X:%02X:%02X:%02X!\n",
+                              g_bond.masterMac[0], g_bond.masterMac[1], g_bond.masterMac[2],
+                              g_bond.masterMac[3], g_bond.masterMac[4], g_bond.masterMac[5]);
                 return;
             }
 
@@ -101,12 +116,17 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     if (g_bond.isPaired == 1) {
         if (memcmp(mac, g_bond.masterMac, 6) != 0) {
             // Command is from an unauthorized transmitter or adjacent layout. Discard!
+            Serial.printf("[Track RX] REJECTED packet from unauthorized MAC %02X:%02X:%02X:%02X:%02X:%02X (bonded to %02X:%02X:%02X:%02X:%02X:%02X)\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                          g_bond.masterMac[0], g_bond.masterMac[1], g_bond.masterMac[2],
+                          g_bond.masterMac[3], g_bond.masterMac[4], g_bond.masterMac[5]);
             return;
         }
     } else {
         // If UNPAIRED, station ignores switch commands until paired with Master
         if (msgType == MSG_TRACK_COMMAND) {
-            Serial.println(F("[Track] Switch command ignored: Station is UNPAIRED. Please pair with Master via Web UI."));
+            Serial.printf("[Track RX] REJECTED MSG_TRACK_COMMAND from %02X:%02X:%02X:%02X:%02X:%02X: Station is UNPAIRED. Pair via Web UI.\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             return;
         }
     }
@@ -115,6 +135,10 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     if (msgType == MSG_TRACK_COMMAND && len >= (int)sizeof(MsgTrackCommand)) {
         const MsgTrackCommand* cmd = (const MsgTrackCommand*)data;
         if (strcmp(cmd->targetNodeId, myId) == 0 || strcmp(cmd->targetNodeId, "ALL") == 0) {
+            Serial.printf("[Track RX <- Master] MSG_TRACK_COMMAND: Target=%s, Switch=%s, DwellTime=%us\n",
+                          cmd->targetNodeId,
+                          cmd->switchPosition == 0 ? "STRAIGHT" : "TURNOUT",
+                          cmd->dwellTimeSec);
             g_track.setSwitchPosition((SwitchState)cmd->switchPosition);
             if (cmd->dwellTimeSec > 0) {
                 g_track.startDwellCountdown(cmd->dwellTimeSec);
@@ -124,11 +148,15 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
     } else if (msgType == MSG_STATION_ETA_BROADCAST && len >= (int)sizeof(MsgStationEtaBroadcast)) {
         const MsgStationEtaBroadcast* eta = (const MsgStationEtaBroadcast*)data;
         if (strcmp(eta->targetStationId, myId) == 0 || strcmp(eta->targetStationId, "ALL") == 0) {
+            const char* sigStr = (eta->signalAspect == SIGNAL_GREEN ? "GREEN" : (eta->signalAspect == SIGNAL_YELLOW ? "YELLOW" : "RED"));
+            Serial.printf("[Track RX <- Master] MSG_STATION_ETA_BROADCAST: Target=%s, Train='%s', ETA=%us, Signal=%s\n",
+                          eta->targetStationId, eta->trainName, eta->etaSeconds, sigStr);
             g_display.updateIncomingTrain(eta->trainName, eta->etaSeconds, (SignalAspect)eta->signalAspect);
         }
     } else if (msgType == MSG_EMERGENCY_STOP) {
+        Serial.printf("[Track RX <- Master] MSG_EMERGENCY_STOP from %02X:%02X:%02X:%02X:%02X:%02X -> Signal RED!\n",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         g_display.updateIncomingTrain("EMERGENCY STOP", 0, SIGNAL_RED);
-        Serial.println(F("[Track] Emergency stop broadcast received."));
     }
 }
 
@@ -143,11 +171,13 @@ void setup() {
     // 1. Initialize Track Switch Servo
     g_track.beginSwitch(PIN_SERVO_SWITCH, 75, 105);
     g_track.onSwitchChanged([](SwitchState state) {
+        Serial.printf("[Track Event] Switch position updated: %s -> Sending telemetry\n",
+                      state == SWITCH_STRAIGHT ? "STRAIGHT" : "TURNOUT");
         g_display.updateTrackStatus(state, g_track.isOccupied());
         sendTrackTelemetry();
     });
     g_track.onDwellComplete([]() {
-        Serial.println(F("[Station] Dwell finished. Notifying Master..."));
+        Serial.println(F("[Track Event] Station dwell countdown completed -> Notifying Master"));
         sendTrackTelemetry();
     });
 
@@ -157,6 +187,8 @@ void setup() {
     g_ir.enableBeamBreakDetection(300); // 300ms timeout triggers beam break
 
     g_ir.onOccupancyChanged([](bool occupied) {
+        Serial.printf("[Track Event] IR Beam Break occupancy: %s -> Sending telemetry\n",
+                      occupied ? "OCCUPIED" : "CLEAR");
         g_track.setOccupied(occupied);
         g_display.updateTrackStatus(g_track.getSwitchPosition(), occupied);
         sendTrackTelemetry();
