@@ -48,11 +48,13 @@ bool ESPNowManager::begin(NodeType role, uint8_t channel) {
     _channel = channel;
 
 #if defined(ESP32)
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-    esp_wifi_set_promiscuous(true);
-    esp_wifi_set_channel(_channel, WIFI_SECOND_CHAN_NONE);
-    esp_wifi_set_promiscuous(false);
+    if (_role != NODE_TYPE_MASTER) {
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect();
+        esp_wifi_set_promiscuous(true);
+        esp_wifi_set_channel(_channel, WIFI_SECOND_CHAN_NONE);
+        esp_wifi_set_promiscuous(false);
+    }
 
     WiFi.macAddress(_ownMac);
     generateNodeId();
@@ -66,9 +68,11 @@ bool ESPNowManager::begin(NodeType role, uint8_t channel) {
     esp_now_register_recv_cb(espNowPlatformRecv);
 
 #elif defined(ESP8266)
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-    wifi_set_channel(_channel);
+    if (_role != NODE_TYPE_MASTER) {
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect();
+        wifi_set_channel(_channel);
+    }
 
     WiFi.macAddress(_ownMac);
     generateNodeId();
@@ -179,8 +183,53 @@ void ESPNowManager::announcePresence() {
     memcpy(msg.mac, _ownMac, 6);
     msg.firmwareVersion = 0x0200; // v2.0
     msg.capabilities = 0xFF;
+    msg.isPaired = _isPaired ? 1 : 0;
+    if (_hasMasterMac) {
+        memcpy(msg.pairedMasterMac, _masterMac, 6);
+    }
 
     sendBroadcast(&msg, sizeof(msg));
+}
+
+void ESPNowManager::sendDiscoveryScan() {
+    MsgDiscoveryScan scan = {};
+    scan.msgType = MSG_DISCOVERY_SCAN;
+    memcpy(scan.masterMac, _ownMac, 6);
+    scan.wifiChannel = _channel;
+    sendBroadcast(&scan, sizeof(scan));
+    Serial.println(F("[ESP-NOW] Discovery scan broadcast sent."));
+}
+
+void ESPNowManager::setPairedState(bool paired, const uint8_t* masterMac) {
+    _isPaired = paired;
+    if (masterMac) {
+        setMasterMac(masterMac);
+    }
+}
+
+bool ESPNowManager::pairNode(const char* targetNodeId) {
+    DiscoveredNode* n = findNode(targetNodeId);
+    if (!n) {
+        Serial.printf("[ESP-NOW] Cannot pair unknown node: %s\n", targetNodeId);
+        return false;
+    }
+    MsgPairConfirm confirm = {};
+    confirm.msgType = MSG_PAIR_CONFIRM;
+    strncpy(confirm.targetNodeId, targetNodeId, sizeof(confirm.targetNodeId) - 1);
+    memcpy(confirm.masterMac, _ownMac, 6);
+    confirm.wifiChannel = _channel;
+    confirm.bondKey = 0x50414952; // "PAIR"
+
+    bool ok = sendUnicast(n->mac, &confirm, sizeof(confirm));
+    if (ok) {
+        n->isPaired = true;
+        n->isBondedOther = false;
+        memcpy(n->pairedMasterMac, _ownMac, 6);
+        Serial.printf("[ESP-NOW] Sent pair confirmation to %s with Master MAC: %s\n",
+                      targetNodeId, getMacAddressStr().c_str());
+        if (_onNodeEventCb) _onNodeEventCb(*n, false);
+    }
+    return ok;
 }
 
 void ESPNowManager::sendHeartbeat() {
@@ -224,7 +273,9 @@ DiscoveredNode* ESPNowManager::findNodeByMac(const uint8_t* mac) {
 
 void ESPNowManager::registerOrUpdateNode(const MsgDiscoveryAnnounce& msg, const uint8_t* mac, int8_t rssi) {
     DiscoveredNode* existing = findNodeByMac(mac);
-    bool isNew = (existing == nullptr);
+
+    bool bondedToMe = (msg.isPaired == 1 && memcmp(msg.pairedMasterMac, _ownMac, 6) == 0);
+    bool bondedOther = (msg.isPaired == 1 && memcmp(msg.pairedMasterMac, _ownMac, 6) != 0);
 
     if (existing) {
         strncpy(existing->nodeId, msg.nodeId, sizeof(existing->nodeId) - 1);
@@ -232,6 +283,9 @@ void ESPNowManager::registerOrUpdateNode(const MsgDiscoveryAnnounce& msg, const 
         existing->lastSeenMs = millis();
         existing->rssi = rssi;
         existing->isOnline = true;
+        existing->isPaired = bondedToMe;
+        existing->isBondedOther = bondedOther;
+        memcpy(existing->pairedMasterMac, msg.pairedMasterMac, 6);
         if (_onNodeEventCb) _onNodeEventCb(*existing, false);
     } else {
         DiscoveredNode newNode = {};
@@ -242,10 +296,14 @@ void ESPNowManager::registerOrUpdateNode(const MsgDiscoveryAnnounce& msg, const 
         newNode.lastSeenMs = millis();
         newNode.rssi = rssi;
         newNode.isOnline = true;
+        newNode.isPaired = bondedToMe;
+        newNode.isBondedOther = bondedOther;
+        memcpy(newNode.pairedMasterMac, msg.pairedMasterMac, 6);
 
         addPeer(mac);
         _nodes.push_back(newNode);
-        Serial.printf("[ESP-NOW] Registered New Node: %s (Type: %d)\n", newNode.nodeId, newNode.nodeType);
+        Serial.printf("[ESP-NOW] Registered Node: %s (Type: %d, PairedToMe: %d, PairedOther: %d)\n",
+                      newNode.nodeId, newNode.nodeType, (int)newNode.isPaired, (int)newNode.isBondedOther);
 
         if (_onNodeEventCb) _onNodeEventCb(_nodes.back(), true);
     }
@@ -322,6 +380,10 @@ void ESPNowManager::handleEspNowRecv(const uint8_t *mac, const uint8_t *data, in
     } else if (msgType == MSG_HEARTBEAT && len >= (int)sizeof(MsgHeartbeat)) {
         const MsgHeartbeat* hb = (const MsgHeartbeat*)data;
         instance().updateNodeHeartbeat(hb->nodeId, hb->rssi);
+    } else if (msgType == MSG_DISCOVERY_SCAN && len >= (int)sizeof(MsgDiscoveryScan)) {
+        if (instance()._role != NODE_TYPE_MASTER) {
+            instance().announcePresence();
+        }
     }
 
     // Forward to application callback

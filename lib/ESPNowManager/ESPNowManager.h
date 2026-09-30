@@ -21,6 +21,9 @@ struct DiscoveredNode {
     uint32_t lastSeenMs;
     int8_t   rssi;
     bool     isOnline;
+    bool     isPaired;          // Bonded to THIS master
+    bool     isBondedOther;     // Bonded to another master
+    uint8_t  pairedMasterMac[6];
     // Cached telemetry
     int8_t   speed;
     uint16_t currentBlock;
@@ -54,8 +57,12 @@ public:
     bool addPeer(const uint8_t* mac);
     bool isPeer(const uint8_t* mac) const;
 
-    // Discovery & Registry (Master)
+    // Discovery, Scan & Pairing
     void announcePresence();
+    void sendDiscoveryScan();
+    bool pairNode(const char* targetNodeId);
+    void setPairedState(bool paired, const uint8_t* masterMac = nullptr);
+    bool isPaired() const { return _isPaired; }
     void sendHeartbeat();
     const std::vector<DiscoveredNode>& getDiscoveredNodes() const { return _nodes; }
     DiscoveredNode* findNode(const char* nodeId);
@@ -86,6 +93,7 @@ private:
     uint8_t _ownMac[6] = {0};
     uint8_t _masterMac[6] = {0};
     bool _hasMasterMac = false;
+    bool _isPaired = false;
     uint8_t _channel = 1;
 
     std::vector<DiscoveredNode> _nodes;

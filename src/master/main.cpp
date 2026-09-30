@@ -74,19 +74,40 @@ void setup() {
     // 1. Initialize Configuration & LittleFS
     ConfigStore::instance().begin();
     const SystemSettings& settings = ConfigStore::instance().getSettings();
+    Serial.printf("[Config] Loaded Settings: SSID='%s', apMode=%d, Ch=%d\n",
+                  settings.wifiSsid.c_str(), (int)settings.apMode, (int)settings.wifiChannel);
 
     // 2. Wi-Fi Configuration (AP or STA)
+    WiFi.persistent(false);
+    WiFi.disconnect(true, true);
+    delay(50);
+
+    IPAddress apIP(192, 168, 4, 1);
+    IPAddress netMsk(255, 255, 255, 0);
+
     if (settings.apMode) {
         WiFi.mode(WIFI_AP_STA);
-        WiFi.softAP(settings.wifiSsid.c_str(), settings.wifiPassword.c_str(), settings.wifiChannel);
+        WiFi.softAPConfig(apIP, apIP, netMsk);
+
+        const char* pass = (settings.wifiPassword.length() >= 8) ? settings.wifiPassword.c_str() : nullptr;
+        uint8_t ch = (settings.wifiChannel >= 1 && settings.wifiChannel <= 13) ? settings.wifiChannel : 1;
+        String ssid = (settings.wifiSsid.length() > 0) ? settings.wifiSsid : String("LegoTrain_Master");
+
+        bool apOk = WiFi.softAP(ssid.c_str(), pass, ch);
+        if (!apOk) {
+            Serial.println(F("[Wi-Fi] ERROR: softAP failed with custom params! Retrying with open 'LegoTrain_Master' on Ch 1..."));
+            WiFi.softAP("LegoTrain_Master", nullptr, 1);
+        }
+
         Serial.printf("[Wi-Fi] SoftAP Started: %s (IP: %s, Ch: %d)\n",
-                      settings.wifiSsid.c_str(),
+                      WiFi.softAPSSID().c_str(),
                       WiFi.softAPIP().toString().c_str(),
-                      settings.wifiChannel);
+                      ch);
 
         // Start Captive Portal DNS to auto-redirect mobile devices
-        g_dnsServer.start(53, "*", WiFi.softAPIP());
-        Serial.println(F("[DNS] Captive Portal server started."));
+        g_dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+        g_dnsServer.start(53, "*", apIP);
+        Serial.printf("[DNS] Captive Portal server started on %s:53\n", apIP.toString().c_str());
     } else {
         WiFi.mode(WIFI_STA);
         WiFi.begin(settings.wifiSsid.c_str(), settings.wifiPassword.c_str());
@@ -102,8 +123,10 @@ void setup() {
         } else {
             Serial.println(F("[Wi-Fi] Failed to connect, falling back to SoftAP"));
             WiFi.mode(WIFI_AP_STA);
-            WiFi.softAP("LegoTrain_Master_Fallback", "", 1);
-            g_dnsServer.start(53, "*", WiFi.softAPIP());
+            WiFi.softAPConfig(apIP, apIP, netMsk);
+            WiFi.softAP("LegoTrain_Master_Fallback", nullptr, 1);
+            g_dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+            g_dnsServer.start(53, "*", apIP);
         }
     }
 
@@ -122,11 +145,13 @@ void setup() {
     // Notify Web UI on node discovery/state changes
     ESPNowManager::instance().onNodeEvent([](const DiscoveredNode& node, bool isNew) {
         JsonDocument doc;
-        doc["nodeId"]       = node.nodeId;
-        doc["friendlyName"] = ConfigStore::instance().getFriendlyName(node.nodeId);
-        doc["nodeType"]     = (node.nodeType == NODE_TYPE_LOCO) ? "LOCO" : "TRACK";
-        doc["isOnline"]     = node.isOnline;
-        doc["isNew"]        = isNew;
+        doc["nodeId"]        = node.nodeId;
+        doc["friendlyName"]  = ConfigStore::instance().getFriendlyName(node.nodeId);
+        doc["nodeType"]      = (node.nodeType == NODE_TYPE_LOCO) ? "LOCO" : "TRACK";
+        doc["isOnline"]      = node.isOnline;
+        doc["isPaired"]      = node.isPaired;
+        doc["isBondedOther"] = node.isBondedOther;
+        doc["isNew"]         = isNew;
         LocoWebServer::instance().broadcastTelemetry("node_update", doc);
     });
 

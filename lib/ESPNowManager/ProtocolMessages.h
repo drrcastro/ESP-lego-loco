@@ -20,6 +20,8 @@ enum MessageType : uint8_t {
     MSG_DISCOVERY_ANNOUNCE      = 0x01,
     MSG_DISCOVERY_ACK           = 0x02,
     MSG_HEARTBEAT               = 0x03,
+    MSG_DISCOVERY_SCAN          = 0x04,
+    MSG_PAIR_CONFIRM            = 0x05,
     MSG_LOCO_COMMAND            = 0x10,
     MSG_LOCO_TELEMETRY          = 0x11,
     MSG_TRACK_COMMAND           = 0x20,
@@ -60,6 +62,8 @@ struct MsgDiscoveryAnnounce {
     uint8_t  mac[6];              // Sender MAC
     uint16_t firmwareVersion;     // e.g. 0x0200 = v2.0
     uint8_t  capabilities;        // Bitmask: [0: Motor, 1: LEDs, 2: IR_RX, 3: IR_TX, 4: Servo, 5: OLED]
+    uint8_t  isPaired;            // 0 = Unpaired (New), 1 = Bonded/Paired
+    uint8_t  pairedMasterMac[6];  // Bonded Master MAC if isPaired == 1
 };
 
 struct MsgDiscoveryAck {
@@ -68,6 +72,20 @@ struct MsgDiscoveryAck {
     uint8_t  masterMac[6];        // Master MAC
     uint8_t  wifiChannel;         // ESP-NOW / Wi-Fi channel
     uint32_t serverEpochTime;     // Synced timestamp
+};
+
+struct MsgDiscoveryScan {
+    uint8_t  msgType;             // MSG_DISCOVERY_SCAN
+    uint8_t  masterMac[6];        // Master MAC
+    uint8_t  wifiChannel;         // Master Wi-Fi channel
+};
+
+struct MsgPairConfirm {
+    uint8_t  msgType;             // MSG_PAIR_CONFIRM
+    char     targetNodeId[16];    // Recipient loco node ID
+    uint8_t  masterMac[6];        // Master MAC to bond with
+    uint8_t  wifiChannel;         // Wi-Fi channel
+    uint32_t bondKey;             // Layout bonding token (0x50414952 "PAIR")
 };
 
 struct MsgHeartbeat {
@@ -138,6 +156,8 @@ union EspMessage {
     MsgDiscoveryAnnounce    discoveryAnnounce;
     MsgDiscoveryAck         discoveryAck;
     MsgHeartbeat            heartbeat;
+    MsgDiscoveryScan        discoveryScan;
+    MsgPairConfirm          pairConfirm;
     MsgLocoCommand          locoCommand;
     MsgLocoTelemetry        locoTelemetry;
     MsgTrackCommand         trackCommand;

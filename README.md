@@ -18,12 +18,16 @@ A high-performance, modular, object-oriented C++ framework for controlling Lego 
   - **Master Gateway:** Hosts an async Web Server with real-time WebSockets and coordinates nodes over **ESP-NOW**.
   - **Mobile Locomotives:** Zero-lag motor control via L9110 H-bridge driver with momentum ramping, 3 independent LED zones, and IR beacon track localization.
   - **Infrastructure / Stations:** Servo-controlled track switches (turnouts), IR beam-break presence/occupancy detection, 38kHz beacon transmitters, and 0.96'' OLED departure/ETA displays.
-- **Auto-Discovery & Plug-and-Play:**
+- **Auto-Discovery & Secure Node Pairing:**
   - Nodes derive their identifier directly from their physical MAC address (`LOCO_4B5C`, `TRACK_1A2B`).
-  - Automatic broadcast announcement on boot (`FF:FF:FF:FF:FF:FF`) and instant registration in the Master node table.
+  - **Pairing & EEPROM Bonding:** New nodes start in an `UNPAIRED` state. Users discover and pair them to a specific Master Gateway with a single click. Once bonded, nodes write the Master's MAC address to EEPROM and **strictly reject commands from any other Master or layout**, preventing accidental crosstalk in multi-track environments (e.g. clubs or conventions).
+  - **Reset / Unpairing:** To unpair a node, simply re-flash its firmware with the *Erase all flash* option checked.
 - **Operating Modes:**
   - **Manual Mode:** Full manual control of throttles (-100% to +100%), directional headlights, cab lights, and track switches via the dark-themed Web UI.
   - **Automatic Mode:** Master runs an event-driven **Scenario Manager** state machine using transactional CSV files stored in LittleFS.
+  - **CSV Import / Export:** Easily backup, share, or edit automation scenarios directly from your browser.
+- **Multi-Layout Isolation & Settings:**
+  - Configure the Master's Wi-Fi SSID, Password, and Radio Channel (1-13) directly from the Web UI to ensure clean operation side-by-side with other train layouts.
 - **Built-in Safety & Failsafe Watchdog:**
   - Locomotives automatically coast/brake to a stop if Master communication is lost for > 4 seconds.
   - Global Emergency Stop (E-STOP) halts all traction and commands signals to red.
@@ -145,7 +149,7 @@ ESP-lego-loco/
 ### 3. Track / Station Node (ESP32 or ESP8266 D1 Mini)
 | Function | ESP32 Pin | ESP8266 (D1 Mini) | Notes |
 | :--- | :--- | :--- | :--- |
-| **Servo Switch** | GPIO 18 | D4 (GPIO 2) | Track Turnout / Agulha Servo |
+| **Servo Switch** | GPIO 18 | D4 (GPIO 2) | Track Turnout / Switch Servo |
 | **IR Beacon TX** | GPIO 19 | D5 (GPIO 14) | 38kHz IR LED (Block code transmitter) |
 | **IR Beam-Break RX**| GPIO 23 | D6 (GPIO 12) | Track occupancy detector |
 | **OLED SDA** | GPIO 21 | D2 (GPIO 4) | 0.96'' SSD1306 (I2C) |
@@ -236,10 +240,11 @@ The Master Gateway hosts a **100% mobile-friendly, touch-optimized web applicati
 - **Lighting Switches:** Single-tap buttons for Auto-Directional lighting, Headlights, and Cab illumination.
 - **Track Turnout Toggles:** Switch track servos between **`STRAIGHT`** and **`TURNOUT`** with visual diagram feedback.
 - **Mobile Bottom Navigation Bar:** Quickly jump between:
-  - 🚂 **Locos:** Multi-train throttle cards with battery voltage and block IDs.
-  - 🔀 **Switches:** Track junctions, servo turnouts, and occupancy detection.
-  - 📜 **Scenarios:** Visual state machine editor for automated routes.
-  - 🛰️ **Fleet:** Auto-discovered nodes with signal strength (RSSI) and custom renaming.
+  - 🚂 **Locos:** Multi-train throttle cards with battery voltage, block IDs, and quick pairing banner.
+  - 🔀 **Switches:** Track junctions, servo turnouts, dwell timers, and station pairing banner.
+  - 📜 **Scenarios:** Visual state machine editor for automated routes with CSV import/export.
+  - 🛰️ **Fleet:** Auto-discovered nodes with signal strength (RSSI), bonding status, and custom renaming.
+  - ⚙️ **Settings:** Access Point SSID, Wi-Fi password, and radio channel configuration.
   - 📋 **Logs:** Live protocol message stream.
 
 > [!TIP]

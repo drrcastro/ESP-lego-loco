@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchNodes();
   fetchScenarios();
   loadScenarioContent(activeScenarioFile);
+  loadNetworkSettings();
 
   // Periodic polling every 3 seconds for node discovery/heartbeats
   setInterval(() => {
@@ -212,19 +213,99 @@ function triggerEmergencyStop() {
 }
 
 // =================================================================
+// Fleet Scanning & Pairing
+// =================================================================
+async function scanFleet() {
+  const btn = document.getElementById("btnScanFleetTop");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Scanning...";
+  }
+  logMessage("system", "🔍 Broadcasting ESP-NOW discovery scan to discover devices...");
+  try {
+    await fetch("/api/locos/scan", { method: "POST" });
+    sendWsCommand({ cmd: "scan_locos" });
+    setTimeout(fetchNodes, 400);
+    setTimeout(fetchNodes, 1200);
+    setTimeout(fetchNodes, 2500);
+    setTimeout(() => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "🔍 Scan for Locomotives";
+      }
+      logMessage("system", "Device discovery scan complete.");
+    }, 3000);
+  } catch (e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🔍 Scan for Locomotives";
+    }
+    logMessage("system", `Error initiating discovery scan: ${e.message}`);
+  }
+}
+
+async function pairNode(nodeId) {
+  logMessage("system", `🔗 Pairing node ${nodeId} to this Master...`);
+  try {
+    const res = await fetch("/api/locos/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeId: nodeId })
+    });
+    if (res.ok) {
+      logMessage("system", `✅ Success! Node ${nodeId} permanently bonded to this Master.`);
+      fetchNodes();
+    } else {
+      logMessage("system", `❌ Failed to pair node ${nodeId}.`);
+    }
+  } catch (e) {
+    logMessage("system", `Error pairing node: ${e.message}`);
+  }
+}
+
+function pairLocomotive(nodeId) {
+  return pairNode(nodeId);
+}
+
+// =================================================================
 // Locomotive Controller Cards
 // =================================================================
 function renderLocoCards(locos) {
   const grid = document.getElementById("locoGrid");
   const empty = document.getElementById("locoEmptyState");
+  const banner = document.getElementById("unpairedFleetBanner");
+  const unpList = document.getElementById("unpairedFleetList");
 
-  if (!locos || locos.length === 0) {
+  const pairedLocos = (locos || []).filter(l => l.isPaired);
+  const unpairedLocos = (locos || []).filter(l => !l.isPaired && !l.isBondedOther);
+
+  if (unpairedLocos.length > 0) {
+    if (banner) banner.style.display = "block";
+    if (unpList) {
+      unpList.innerHTML = unpairedLocos.map(u => `
+        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong style="color:var(--text); font-size: 0.95rem;">🚂 ${u.nodeId}</strong>
+            <span style="font-size: 0.8rem; color: var(--text-dim); margin-left: 8px;">(${u.friendlyName || 'New Locomotive'}) &bull; RSSI: ${u.rssi || -50}dBm</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="pairLocomotive('${u.nodeId}')">
+            🔗 Pair to this Master
+          </button>
+        </div>
+      `).join("");
+    }
+  } else {
+    if (banner) banner.style.display = "none";
+  }
+
+  if (pairedLocos.length === 0) {
     if (empty) empty.style.display = "block";
+    document.querySelectorAll(".loco-card").forEach(c => c.remove());
     return;
   }
   if (empty) empty.style.display = "none";
 
-  locos.forEach(loco => {
+  pairedLocos.forEach(loco => {
     let card = document.getElementById(`loco_card_${loco.nodeId}`);
     if (!card) {
       card = document.createElement("div");
@@ -239,7 +320,10 @@ function renderLocoCards(locos) {
           <span class="loco-id">${loco.nodeId}</span>
           <h3 class="loco-name" onclick="renameNode('${loco.nodeId}', '${loco.friendlyName}')">${loco.friendlyName} ✎</h3>
         </div>
-        <span class="pill ${loco.isOnline ? 'highlight' : ''}">${loco.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="badge" style="background:rgba(0,242,155,0.15); color:var(--success);">🔒 CASADA</span>
+          <span class="pill ${loco.isOnline ? 'highlight' : ''}">${loco.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+        </div>
       </div>
 
       <div class="loco-telemetry-pills">
@@ -261,9 +345,9 @@ function renderLocoCards(locos) {
       </div>
 
       <div class="loco-actions">
-        <button class="btn-dir ${loco.speed > 0 ? 'active' : ''}" onclick="setLocoPresetSpeed('${loco.nodeId}', 50)">FWD 50%</button>
-        <button class="btn-brake" onclick="brakeLoco('${loco.nodeId}')">STOP</button>
-        <button class="btn-dir ${loco.speed < 0 ? 'active' : ''}" onclick="setLocoPresetSpeed('${loco.nodeId}', -50)">REV 50%</button>
+        <button class="btn-dir ${loco.speed < 0 ? 'active' : ''}" onclick="setLocoPresetSpeed('${loco.nodeId}', -50)">◀ REV 50%</button>
+        <button class="btn-brake" onclick="brakeLoco('${loco.nodeId}')">⏹ STOP</button>
+        <button class="btn-dir ${loco.speed > 0 ? 'active' : ''}" onclick="setLocoPresetSpeed('${loco.nodeId}', 50)">FWD 50% ▶</button>
       </div>
 
       <div class="lighting-panel">
@@ -350,14 +434,39 @@ function updateLocoCardTelemetry(d) {
 function renderTrackCards(tracks) {
   const grid = document.getElementById("trackGrid");
   const empty = document.getElementById("trackEmptyState");
+  const banner = document.getElementById("unpairedTrackBanner");
+  const unpList = document.getElementById("unpairedTrackList");
 
-  if (!tracks || tracks.length === 0) {
+  const pairedTracks = (tracks || []).filter(t => t.isPaired);
+  const unpairedTracks = (tracks || []).filter(t => !t.isPaired && !t.isBondedOther);
+
+  if (unpairedTracks.length > 0) {
+    if (banner) banner.style.display = "block";
+    if (unpList) {
+      unpList.innerHTML = unpairedTracks.map(u => `
+        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong style="color:var(--text); font-size: 0.95rem;">🚉 ${u.nodeId}</strong>
+            <span style="font-size: 0.8rem; color: var(--text-dim); margin-left: 8px;">(${u.friendlyName || 'New Station'}) &bull; RSSI: ${u.rssi || -50}dBm</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="pairNode('${u.nodeId}')">
+            🔗 Pair to this Master
+          </button>
+        </div>
+      `).join("");
+    }
+  } else {
+    if (banner) banner.style.display = "none";
+  }
+
+  if (pairedTracks.length === 0) {
     if (empty) empty.style.display = "block";
+    document.querySelectorAll(".track-card").forEach(c => c.remove());
     return;
   }
   if (empty) empty.style.display = "none";
 
-  tracks.forEach(tr => {
+  pairedTracks.forEach(tr => {
     let card = document.getElementById(`track_card_${tr.nodeId}`);
     if (!card) {
       card = document.createElement("div");
@@ -375,7 +484,10 @@ function renderTrackCards(tracks) {
           <span class="loco-id">${tr.nodeId}</span>
           <h3 class="loco-name" onclick="renameNode('${tr.nodeId}', '${tr.friendlyName}')">${tr.friendlyName} ✎</h3>
         </div>
-        <span class="pill ${isOccupied ? 'highlight' : ''}">${isOccupied ? '🔴 OCCUPIED' : '🟢 CLEAR'}</span>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="badge" style="background:rgba(0,242,155,0.15); color:var(--success);">🔒 CASADA</span>
+          <span class="pill ${isOccupied ? 'highlight' : ''}">${isOccupied ? '🔴 OCCUPIED' : '🟢 CLEAR'}</span>
+        </div>
       </div>
 
       <div class="track-diagram">
@@ -608,6 +720,28 @@ function exportScenarioCsv() {
   URL.revokeObjectURL(url);
 }
 
+async function importScenarioCsvFile(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  try {
+    const text = await file.text();
+    const res = await fetch("/api/scenario?name=" + encodeURIComponent(file.name), {
+      method: "POST",
+      body: text
+    });
+    if (res.ok) {
+      logMessage("system", `Scenario '${file.name}' imported successfully.`);
+      fetchScenarios();
+      loadScenarioContent(file.name);
+    } else {
+      logMessage("system", `Failed to save imported scenario '${file.name}'.`);
+    }
+  } catch (e) {
+    logMessage("system", `Error importing CSV: ${e.message}`);
+  }
+  input.value = "";
+}
+
 function runCurrentScenario() {
   const filename = document.getElementById("scenarioFileName").value.trim();
   sendWsCommand({ cmd: "run_scenario", scenario: filename, run: true });
@@ -629,11 +763,22 @@ function renderNodeTable(nodes) {
   tbody.innerHTML = "";
 
   if (!nodes || nodes.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-dim);">No nodes registered</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-dim);">No nodes registered</td></tr>`;
     return;
   }
 
   nodes.forEach(n => {
+    let pairBadge = `<span style="color:var(--text-dim);">-</span>`;
+    if (n.nodeType === "LOCO" || n.nodeType === "TRACK") {
+      if (n.isPaired) {
+        pairBadge = `<span class="badge" style="background:rgba(0,242,155,0.15);color:var(--success);">🔒 Bonded</span>`;
+      } else if (n.isBondedOther) {
+        pairBadge = `<span class="badge" style="background:rgba(255,51,102,0.15);color:var(--danger);">Other Master</span>`;
+      } else {
+        pairBadge = `<span class="badge" style="background:rgba(255,183,3,0.15);color:var(--warning);">Unpaired</span> <button class="btn btn-sm btn-primary" style="padding:2px 8px;font-size:0.75rem;margin-left:4px;" onclick="pairNode('${n.nodeId}')">🔗 Pair</button>`;
+      }
+    }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><strong>${n.nodeId}</strong></td>
@@ -642,6 +787,7 @@ function renderNodeTable(nodes) {
       </td>
       <td><span class="badge">${n.nodeType}</span></td>
       <td>${n.rssi || -50} dBm</td>
+      <td>${pairBadge}</td>
       <td>${n.nodeType === 'LOCO' ? `Spd: ${n.speed}%, Blk: #${n.currentBlock}` : `Sw: ${n.switchState}, Occ: ${n.beamOccupied}`}</td>
       <td>${n.lastSeenSec || 0}s ago</td>
       <td>
@@ -694,4 +840,59 @@ function logMessage(type, text) {
 function clearLogs() {
   const box = document.getElementById("eventLogConsole");
   if (box) box.innerHTML = "";
+}
+
+// =================================================================
+// Network Settings (AP Configuration)
+// =================================================================
+async function loadNetworkSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return;
+    const s = await res.json();
+    const elSsid = document.getElementById("settingWifiSsid");
+    const elPass = document.getElementById("settingWifiPassword");
+    const elChan = document.getElementById("settingWifiChannel");
+    if (elSsid) elSsid.value = s.wifiSsid || "LegoTrain_Master";
+    if (elPass) elPass.value = s.wifiPassword || "";
+    if (elChan) elChan.value = s.wifiChannel || 1;
+  } catch (e) {
+    console.warn("Could not load network settings:", e);
+  }
+}
+
+async function saveNetworkSettings() {
+  const ssid = document.getElementById("settingWifiSsid").value.trim();
+  const pass = document.getElementById("settingWifiPassword").value;
+  const chan = parseInt(document.getElementById("settingWifiChannel").value) || 1;
+  const fb = document.getElementById("settingsFeedback");
+
+  if (!ssid) {
+    alert("SSID cannot be empty!");
+    return;
+  }
+  if (pass.length > 0 && pass.length < 8) {
+    alert("Password must be at least 8 characters or left empty for open network!");
+    return;
+  }
+
+  if (fb) fb.innerHTML = `<span style="color:var(--primary);">Saving configuration to Master...</span>`;
+
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wifiSsid: ssid, wifiPassword: pass, wifiChannel: chan, apMode: true })
+    });
+
+    if (res.ok) {
+      if (fb) fb.innerHTML = `<span style="color:var(--success);font-weight:700;">✅ Settings saved! Rebooting Master Gateway... Reconnect to Wi-Fi '${ssid}' in 10s.</span>`;
+      logMessage("system", `Settings saved. Rebooting Master with SSID '${ssid}' on channel ${chan}.`);
+      await fetch("/api/restart", { method: "POST" });
+    } else {
+      if (fb) fb.innerHTML = `<span style="color:var(--danger);">❌ Failed to save settings to Master.</span>`;
+    }
+  } catch (e) {
+    if (fb) fb.innerHTML = `<span style="color:var(--danger);">❌ Error communicating with Master: ${e.message}</span>`;
+  }
 }

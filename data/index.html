@@ -114,18 +114,57 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
         Event Telemetry
       </button>
+      <button class="nav-tab" data-tab="tabSettings" onclick="switchTab('tabSettings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        AP Settings
+      </button>
     </nav>
 
     <!-- TAB 1: LOCOMOTIVES -->
     <main id="tabLocos" class="tab-content active">
       <div class="section-header">
-        <h2>Train Fleet Control</h2>
-        <span class="badge">Real-time Throttle &amp; Lights</span>
+        <div>
+          <h2>Train Fleet Control</h2>
+          <span class="badge">Real-time Throttle &amp; Lights</span>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnScanFleetTop" onclick="scanFleet()">
+          🔍 Scan for Locomotives
+        </button>
       </div>
+
+      <!-- Pairing & Discovery Banner for Unpaired Locos -->
+      <div id="unpairedFleetBanner" style="display:none; margin-bottom: 16px; background: rgba(255,183,3,0.06); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h3 style="font-size:0.95rem; color:var(--warning); display:flex; align-items:center; gap:6px; margin:0;">
+            ⚠️ New Locomotives Detected (Unpaired)
+          </h3>
+          <span class="badge" style="background:rgba(255,183,3,0.15); color:var(--warning);">Ready to Pair</span>
+        </div>
+        <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:10px;">
+          These locomotives were detected on the radio channel but are not bonded to this Master Gateway. Click <b>Pair to this Master</b> to associate.
+        </p>
+        <div id="unpairedFleetList"></div>
+      </div>
+
       <div id="locoGrid" class="cards-grid">
         <div class="empty-state" id="locoEmptyState">
-          <p>Scanning for locomotives via ESP-NOW broadcast...</p>
-          <span class="hint">Ensure train nodes are powered on. Node ID will appear automatically.</span>
+          <div style="max-width: 480px; margin: 0 auto; text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 10px;">🚂</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No Locomotive Paired</h3>
+            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
+              To control a locomotive, it must be <b>bonded</b> to this Master Gateway to prevent interference with other train layouts.
+            </p>
+            <div style="background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 12px; text-align: left; font-size: 0.8rem; margin-bottom: 16px; line-height: 1.6;">
+              <b>Pairing Procedure:</b><br>
+              1. Power on the locomotive (LED pulses gently in standby mode).<br>
+              2. Click the <b>"Scan for Locomotives"</b> button below.<br>
+              3. When the locomotive appears, click <b>"Pair to this Master"</b>.<br>
+              🔒 <i>Note: Once bonded, the locomotive responds exclusively to this Master. To reset / switch Master, re-flash firmware with Erase Flash.</i>
+            </div>
+            <button class="btn btn-primary" onclick="scanFleet()">
+              🔍 Scan for Locomotives
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -133,13 +172,48 @@
     <!-- TAB 2: TRACK & STATIONS -->
     <section id="tabTrack" class="tab-content">
       <div class="section-header">
-        <h2>Track Switches &amp; Station Infrastructure</h2>
-        <span class="badge">Servos, IR Beams &amp; Dwell Timers</span>
+        <div>
+          <h2>Track Switches &amp; Station Infrastructure</h2>
+          <span class="badge">Servos, IR Beams &amp; Dwell Timers</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="scanFleet()">
+          🔍 Scan for Stations &amp; Infrastructure
+        </button>
       </div>
+
+      <!-- Pairing & Discovery Banner for Unpaired Track Stations -->
+      <div id="unpairedTrackBanner" style="display:none; margin-bottom: 16px; background: rgba(255,183,3,0.06); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h3 style="font-size:0.95rem; color:var(--warning); display:flex; align-items:center; gap:6px; margin:0;">
+            ⚠️ New Stations / Turnouts Detected (Unpaired)
+          </h3>
+          <span class="badge" style="background:rgba(255,183,3,0.15); color:var(--warning);">Ready to Pair</span>
+        </div>
+        <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:10px;">
+          These stations were detected on the radio channel but are not bonded to this Master Gateway. Click <b>Pair to this Master</b> to associate.
+        </p>
+        <div id="unpairedTrackList"></div>
+      </div>
+
       <div id="trackGrid" class="cards-grid">
         <div class="empty-state" id="trackEmptyState">
-          <p>Scanning for track nodes &amp; stations...</p>
-          <span class="hint">Track nodes announce via ESP-NOW on power-up.</span>
+          <div style="max-width: 480px; margin: 0 auto; text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 10px;">🚉</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No Station Paired</h3>
+            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
+              To control turnouts and signals, stations must be <b>bonded</b> to this Master to prevent other layouts from actuating your track switches.
+            </p>
+            <div style="background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 12px; text-align: left; font-size: 0.8rem; margin-bottom: 16px; line-height: 1.6;">
+              <b>Station Pairing Procedure:</b><br>
+              1. Power on the station node (OLED display shows <i>UNPAIRED / AWAITING PAIRING</i>).<br>
+              2. Click the <b>"Scan for Stations"</b> button.<br>
+              3. Click <b>"Pair to this Master"</b>.<br>
+              🔒 <i>Note: Once bonded, the station responds exclusively to this Master. To reset / switch Master, re-flash firmware with Erase Flash.</i>
+            </div>
+            <button class="btn btn-primary" onclick="scanFleet()">
+              🔍 Scan for Stations
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -180,6 +254,10 @@
               <button class="btn btn-secondary btn-sm" onclick="exportScenarioCsv()">
                 Export .CSV
               </button>
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importCsvInput').click()">
+                Import .CSV
+              </button>
+              <input type="file" id="importCsvInput" accept=".csv" style="display:none;" onchange="importScenarioCsvFile(this)">
               <button class="btn btn-primary btn-sm" onclick="saveScenarioToServer()">
                 💾 Save to Master
               </button>
@@ -222,7 +300,10 @@
       <div class="panel">
         <div class="panel-header">
           <h2>Discovered Node Topology (ESP-NOW)</h2>
-          <button class="btn btn-secondary btn-sm" onclick="refreshNodesList()">🔄 Refresh</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="scanFleet()">🔍 Scan for Devices</button>
+            <button class="btn btn-secondary btn-sm" onclick="refreshNodesList()">🔄 Refresh</button>
+          </div>
         </div>
         <div class="table-container">
           <table class="data-table">
@@ -232,6 +313,7 @@
                 <th>Custom Name</th>
                 <th>Role</th>
                 <th>Signal (RSSI)</th>
+                <th>Bonding / Pairing</th>
                 <th>State / Telemetry</th>
                 <th>Last Seen</th>
                 <th>Status</th>
@@ -257,6 +339,41 @@
         </div>
       </div>
     </section>
+
+    <!-- TAB 6: AP & NETWORK SETTINGS -->
+    <section id="tabSettings" class="tab-content">
+      <div class="panel" style="max-width: 600px; margin: 0 auto;">
+        <div class="panel-header">
+          <h2>Access Point &amp; Network Configuration</h2>
+        </div>
+        <p style="font-size: 0.85rem; color: #8a99b5; margin-bottom: 16px; line-height: 1.5;">
+          Configure the Master Gateway SSID and Radio Channel to isolate layouts and prevent radio interference (Wi-Fi and ESP-NOW) when operating in multi-track environments.
+        </p>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi SSID (Access Point Name):</label>
+          <input type="text" id="settingWifiSsid" class="input-inline" placeholder="LegoTrain_Master" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi Password (Leave empty for open network):</label>
+          <input type="password" id="settingWifiPassword" class="input-inline" placeholder="Min 8 characters or empty" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi &amp; ESP-NOW Channel (1 to 13):</label>
+          <input type="number" id="settingWifiChannel" min="1" max="13" class="input-inline" value="1" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
+          <span style="display:block;font-size:0.75rem;color:#8a99b5;margin-top:4px;">
+            Tip: Layout 1 on Channel 1, Layout 2 on Channel 6 or 11.
+          </span>
+        </div>
+
+        <button class="btn btn-primary btn-block" style="padding:14px;font-weight:700;font-size:1rem;background:linear-gradient(135deg, #00d2ff, #0077b6);color:#000;border:none;border-radius:8px;cursor:pointer;width:100%;" onclick="saveNetworkSettings()">
+          💾 Save Settings &amp; Restart Master
+        </button>
+        <div id="settingsFeedback" style="margin-top: 12px; font-size: 0.85rem; text-align: center;"></div>
+      </div>
+    </section>
   </div>
 
   <!-- Bottom Navigation Bar for Mobile Phones -->
@@ -276,6 +393,10 @@
     <button class="bottom-nav-item" data-tab="tabNodes" onclick="switchTab('tabNodes')">
       <span class="icon">🛰️</span>
       <span class="label">Fleet</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabSettings" onclick="switchTab('tabSettings')">
+      <span class="icon">⚙️</span>
+      <span class="label">Settings</span>
     </button>
     <button class="bottom-nav-item" data-tab="tabLogs" onclick="switchTab('tabLogs')">
       <span class="icon">📋</span>

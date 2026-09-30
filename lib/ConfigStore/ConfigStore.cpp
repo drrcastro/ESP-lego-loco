@@ -29,8 +29,12 @@ bool ConfigStore::begin() {
         LittleFS.mkdir(SCENARIOS_DIR);
     }
 
-    loadSettings();
-    loadNodeMappings();
+    if (!loadSettings()) {
+        saveSettings();
+    }
+    if (!loadNodeMappings()) {
+        saveNodeMappings();
+    }
     createDefaultScenarioIfNotExists();
 
     return true;
@@ -131,6 +135,9 @@ bool ConfigStore::loadSettings() {
     if (doc["apMode"].is<bool>()) _settings.apMode = doc["apMode"].as<bool>();
     if (doc["wifiChannel"].is<uint8_t>()) _settings.wifiChannel = doc["wifiChannel"].as<uint8_t>();
     if (doc["activeScenario"].is<const char*>()) _settings.activeScenario = doc["activeScenario"].as<String>();
+
+    if (_settings.wifiSsid.length() == 0) _settings.wifiSsid = "LegoTrain_Master";
+    if (_settings.wifiChannel < 1 || _settings.wifiChannel > 13) _settings.wifiChannel = 1;
 
     return true;
 }
