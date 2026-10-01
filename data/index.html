@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#090d16">
-  <title>Lego Loco Control Center V2.0</title>
+  <title>Lego Loco Control Center</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,8 +28,8 @@
             <circle cx="16" cy="15" r="1"></circle>
           </svg>
           <div>
-            <h1>LEGO LOCO <span>V2.0</span></h1>
-            <p class="subtitle">MODULAR DISPATCH &amp; TRAIN CONTROL</p>
+            <h1>LEGO LOCO</h1>
+            <p class="subtitle">AUTONOMOUS DISPATCH &amp; TRAFFIC REGULATION</p>
           </div>
         </div>
       </div>
@@ -40,7 +40,7 @@
             <span class="dot"></span> MANUAL
           </button>
           <button id="btnModeAuto" class="mode-btn" onclick="setSystemMode('AUTOMATIC')">
-            <span class="dot"></span> AUTOMATIC
+            <span class="dot"></span> AUTONOMOUS
           </button>
         </div>
       </div>
@@ -83,8 +83,8 @@
         <span class="stat-value" id="statTrackCount">0</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Active Scenario</span>
-        <span class="stat-value text-accent" id="statActiveScenario">None</span>
+        <span class="stat-label">Circuit Topology</span>
+        <span class="stat-value text-accent" id="statCircuitStatus">Ready</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">System Uptime</span>
@@ -102,9 +102,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v18"></path><path d="M18 3v18"></path><path d="m6 8 12 8"></path><path d="M3 5h6"></path><path d="M15 5h6"></path><path d="M3 19h6"></path><path d="M15 19h6"></path></svg>
         Track &amp; Stations
       </button>
-      <button class="nav-tab" data-tab="tabScenarios" onclick="switchTab('tabScenarios')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-        Scenario Manager (CSV)
+      <button class="nav-tab" data-tab="tabMap" onclick="switchTab('tabMap')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
+        Circuit Map (CTC)
+      </button>
+      <button class="nav-tab" data-tab="tabConfig" onclick="switchTab('tabConfig')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Advanced Config
       </button>
       <button class="nav-tab" data-tab="tabNodes" onclick="switchTab('tabNodes')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
@@ -113,10 +117,6 @@
       <button class="nav-tab" data-tab="tabLogs" onclick="switchTab('tabLogs')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
         Event Telemetry
-      </button>
-      <button class="nav-tab" data-tab="tabSettings" onclick="switchTab('tabSettings')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        AP Settings
       </button>
     </nav>
 
@@ -218,84 +218,200 @@
       </div>
     </section>
 
-    <!-- TAB 3: SCENARIO MANAGER (CSV) -->
-    <section id="tabScenarios" class="tab-content">
-      <div class="scenario-layout">
-        <!-- Sidebar: Scenario Files -->
-        <div class="scenario-sidebar panel">
-          <div class="panel-header">
-            <h3>Scenarios</h3>
-            <button class="btn btn-sm btn-primary" onclick="createNewScenario()">+ New</button>
+    <!-- TAB 3: CIRCUIT MAP (CTC SYNOPTIC) -->
+    <section id="tabMap" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Centralized Traffic Control (CTC) Synoptic Map</h2>
+            <p class="subtitle" style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Live Vector Schematic Auto-Generated from Track Beacons &amp; Locomotive Learning Lap
+            </p>
           </div>
-          <ul id="scenarioFileList" class="file-list">
-            <!-- Populated via API -->
-          </ul>
-          <div class="scenario-actions">
-            <button id="btnRunScenario" class="btn btn-success btn-block" onclick="runCurrentScenario()">
-              ▶ Run Scenario
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-sm btn-primary" onclick="startLearningLap('ALL')">
+              🚀 Start Learning Lap
             </button>
-            <button id="btnStopScenario" class="btn btn-danger btn-block" onclick="stopCurrentScenario()">
-              ⏹ Stop
+            <button class="btn btn-sm btn-secondary" onclick="fetchTopology()">
+              🔄 Refresh Map
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="resetSynopticZoom()">
+              📐 Reset View
             </button>
           </div>
         </div>
 
-        <!-- Main Scenario Editor -->
-        <div class="scenario-editor-panel panel">
-          <div class="panel-header">
-            <div class="scenario-title-area">
-              <span class="label">FILE:</span>
-              <input type="text" id="scenarioFileName" value="default.csv" class="input-inline">
-            </div>
-            <div class="btn-group">
-              <button class="btn btn-secondary btn-sm" onclick="toggleCsvViewMode()" id="btnToggleCsvMode">
-                Switch to Raw CSV
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="exportScenarioCsv()">
-                Export .CSV
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importCsvInput').click()">
-                Import .CSV
-              </button>
-              <input type="file" id="importCsvInput" accept=".csv" style="display:none;" onchange="importScenarioCsvFile(this)">
-              <button class="btn btn-primary btn-sm" onclick="saveScenarioToServer()">
-                💾 Save to Master
-              </button>
-            </div>
-          </div>
+        <!-- Legend HUD -->
+        <div class="synoptic-legend">
+          <div class="legend-item"><span class="legend-dot dot-clear"></span> Track Block Clear</div>
+          <div class="legend-item"><span class="legend-dot dot-occupied"></span> Block Occupied (Train)</div>
+          <div class="legend-item"><span class="legend-dot dot-switch"></span> Turnout Switch Point</div>
+          <div class="legend-item"><span class="legend-dot dot-platform"></span> Station Platform Stop</div>
+          <div class="legend-item"><span class="legend-dot dot-beacon"></span> Localizer Beacon</div>
+        </div>
 
-          <!-- Visual Table View -->
-          <div id="scenarioTableView" class="table-container">
-            <table class="data-table" id="scenarioTable">
-              <thead>
-                <tr>
-                  <th style="width: 70px;">Step</th>
-                  <th>Trigger Type</th>
-                  <th>Trigger Value</th>
-                  <th>Target Node</th>
-                  <th>Action</th>
-                  <th>Parameter</th>
-                  <th style="width: 90px;">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="scenarioTableBody">
-                <!-- Dynamically populated rows -->
-              </tbody>
-            </table>
-            <div class="table-footer">
-              <button class="btn btn-outline btn-sm" onclick="addScenarioStep()">+ Add Step</button>
-            </div>
-          </div>
+        <!-- SVG Map Container -->
+        <div class="synoptic-map-wrapper" id="synopticWrapper">
+          <svg id="circuitMapSvg" viewBox="0 0 1000 480" class="synoptic-svg">
+            <defs>
+              <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
 
-          <!-- Raw Monospace CSV Editor View -->
-          <div id="scenarioRawView" class="raw-editor-container" style="display: none;">
-            <textarea id="scenarioRawText" class="csv-textarea" spellcheck="false"></textarea>
+            <!-- Dynamic Track Layers rendered by app.js -->
+            <g id="svgTracksLayer"></g>
+            <g id="svgSwitchesLayer"></g>
+            <g id="svgStationsLayer"></g>
+            <g id="svgBeaconsLayer"></g>
+            <g id="svgTrainsLayer"></g>
+          </svg>
+        </div>
+
+        <!-- Live Train Dispatch Status Bar -->
+        <div class="synoptic-status-panel" id="synopticStatusPanel">
+          <div style="font-size:0.85rem; color:var(--text-dim); text-align:center; padding:10px;">
+            Awaiting telemetry from active trains...
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 4: FLEET DISCOVERY & TOPOLOGY -->
+    <!-- TAB 4: ADVANCED CONFIGURATION (3 SUB-TABS) -->
+    <section id="tabConfig" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Advanced Configuration Studio</h2>
+            <p class="subtitle" style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Autonomous Operation, Anti-Collision Headways, Multi-Beacon Allocation &amp; Train Length Setup
+            </p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveActiveConfig()">
+            💾 Save All Configurations
+          </button>
+        </div>
+
+        <!-- Sub-Navigation Pills -->
+        <div class="config-subtabs">
+          <button class="config-subtab-btn active" data-subtab="cfgSubGlobal" onclick="switchConfigSubtab('cfgSubGlobal')">
+            🌐 Global / System
+          </button>
+          <button class="config-subtab-btn" data-subtab="cfgSubLocos" onclick="switchConfigSubtab('cfgSubLocos')">
+            🚂 Locomotives
+          </button>
+          <button class="config-subtab-btn" data-subtab="cfgSubStations" onclick="switchConfigSubtab('cfgSubStations')">
+            🚉 Stations &amp; Beacons
+          </button>
+        </div>
+
+        <!-- SUBTAB 1: GLOBAL / SYSTEM -->
+        <div id="cfgSubGlobal" class="config-subtab-pane active">
+          <div class="config-grid-layout">
+            <div class="config-card">
+              <h3>Layout &amp; Wi-Fi Network Settings</h3>
+              <p class="card-desc">Master Gateway Access Point and Radio Channel isolation for exhibitions.</p>
+              
+              <div class="form-group">
+                <label>Layout / Venue Name:</label>
+                <input type="text" id="cfgLayoutName" class="form-control" placeholder="Lego Central Layout">
+              </div>
+
+              <div class="form-group">
+                <label>Wi-Fi SSID (Access Point Name):</label>
+                <input type="text" id="cfgWifiSsid" class="form-control" placeholder="LegoTrain_Master">
+              </div>
+
+              <div class="form-group">
+                <label>Wi-Fi Password (Empty for open network):</label>
+                <input type="password" id="cfgWifiPassword" class="form-control" placeholder="Min 8 chars or empty">
+              </div>
+
+              <div class="form-group">
+                <label>Radio Channel (1 to 13):</label>
+                <input type="number" id="cfgWifiChannel" min="1" max="13" class="form-control" value="1">
+                <span class="field-hint">Isolate multi-track setups: Layout 1 on Ch 1, Layout 2 on Ch 6/11.</span>
+              </div>
+            </div>
+
+            <div class="config-card">
+              <h3>Anti-Collision Headway &amp; Traffic Regulation</h3>
+              <p class="card-desc">Safety buffers governing dynamic 3-zone speed trimming and platform interlocking.</p>
+
+              <div class="form-group">
+                <label>Safe Headway Buffer (Seconds):</label>
+                <input type="number" id="cfgHeadwaySafeSec" min="5" max="60" class="form-control" value="12">
+                <span class="field-hint">Green Aspect: Safe minimum separation interval between trains.</span>
+              </div>
+
+              <div class="form-group">
+                <label>Caution Headway Buffer (Seconds):</label>
+                <input type="number" id="cfgHeadwayCautionSec" min="2" max="30" class="form-control" value="6">
+                <span class="field-hint">Yellow Aspect: Separation interval triggering speed reduction.</span>
+              </div>
+
+              <div class="form-group">
+                <label>Caution Speed Reduction (% Trim):</label>
+                <input type="number" id="cfgHeadwaySpeedTrimPct" min="10" max="80" class="form-control" value="40">
+                <span class="field-hint">Percentage throttle reduction applied in caution zone (e.g. 40%).</span>
+              </div>
+
+              <div class="form-group">
+                <label>Emergency Action on Signal Breach:</label>
+                <select id="cfgEmergencyPolicy" class="form-control">
+                  <option value="STOP_SECTOR">Immediate Sector Emergency Stop</option>
+                  <option value="BRAKE_ONLY">Active Motor Electric Brake</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px; text-align:right;">
+            <button class="btn btn-primary" onclick="saveGlobalConfig()">
+              💾 Save Global Settings
+            </button>
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: LOCOMOTIVES -->
+        <div id="cfgSubLocos" class="config-subtab-pane">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+              Autonomous locomotive kinetic parameters, calibration speeds, and train length records.
+            </p>
+            <button class="btn btn-sm btn-primary" onclick="startLearningLap('ALL')">
+              🚀 Start Fleet Learning Lap
+            </button>
+          </div>
+          <div id="locoConfigContainer" class="config-cards-list">
+            <!-- Populated via loadConfig() -->
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: STATIONS & BEACONS -->
+        <div id="cfgSubStations" class="config-subtab-pane">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+              Turnout alignment, siding capacities, multi-beacon assignment, and train length optical measurement.
+            </p>
+          </div>
+          <div id="stationConfigContainer" class="config-cards-list">
+            <!-- Populated via loadConfig() -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: FLEET DISCOVERY & TOPOLOGY TABLE -->
     <section id="tabNodes" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -327,7 +443,7 @@
       </div>
     </section>
 
-    <!-- TAB 5: TELEMETRY LOGS -->
+    <!-- TAB 6: TELEMETRY LOGS -->
     <section id="tabLogs" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -337,41 +453,6 @@
         <div class="console-box" id="eventLogConsole">
           <div class="log-line system">[SYSTEM] Web UI initialized. Awaiting WebSocket link...</div>
         </div>
-      </div>
-    </section>
-
-    <!-- TAB 6: AP & NETWORK SETTINGS -->
-    <section id="tabSettings" class="tab-content">
-      <div class="panel" style="max-width: 600px; margin: 0 auto;">
-        <div class="panel-header">
-          <h2>Access Point &amp; Network Configuration</h2>
-        </div>
-        <p style="font-size: 0.85rem; color: #8a99b5; margin-bottom: 16px; line-height: 1.5;">
-          Configure the Master Gateway SSID and Radio Channel to isolate layouts and prevent radio interference (Wi-Fi and ESP-NOW) when operating in multi-track environments.
-        </p>
-
-        <div class="form-group" style="margin-bottom: 14px;">
-          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi SSID (Access Point Name):</label>
-          <input type="text" id="settingWifiSsid" class="input-inline" placeholder="LegoTrain_Master" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 14px;">
-          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi Password (Leave empty for open network):</label>
-          <input type="password" id="settingWifiPassword" class="input-inline" placeholder="Min 8 characters or empty" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:#8a99b5;">Wi-Fi &amp; ESP-NOW Channel (1 to 13):</label>
-          <input type="number" id="settingWifiChannel" min="1" max="13" class="input-inline" value="1" style="width:100%;padding:10px 12px;background:#0e1320;color:#f0f4fc;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">
-          <span style="display:block;font-size:0.75rem;color:#8a99b5;margin-top:4px;">
-            Tip: Layout 1 on Channel 1, Layout 2 on Channel 6 or 11.
-          </span>
-        </div>
-
-        <button class="btn btn-primary btn-block" style="padding:14px;font-weight:700;font-size:1rem;background:linear-gradient(135deg, #00d2ff, #0077b6);color:#000;border:none;border-radius:8px;cursor:pointer;width:100%;" onclick="saveNetworkSettings()">
-          💾 Save Settings &amp; Restart Master
-        </button>
-        <div id="settingsFeedback" style="margin-top: 12px; font-size: 0.85rem; text-align: center;"></div>
       </div>
     </section>
   </div>
@@ -386,17 +467,17 @@
       <span class="icon">🔀</span>
       <span class="label">Switches</span>
     </button>
-    <button class="bottom-nav-item" data-tab="tabScenarios" onclick="switchTab('tabScenarios')">
-      <span class="icon">📜</span>
-      <span class="label">Scenarios</span>
+    <button class="bottom-nav-item" data-tab="tabMap" onclick="switchTab('tabMap')">
+      <span class="icon">🗺️</span>
+      <span class="label">Map</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="tabConfig" onclick="switchTab('tabConfig')">
+      <span class="icon">⚙️</span>
+      <span class="label">Config</span>
     </button>
     <button class="bottom-nav-item" data-tab="tabNodes" onclick="switchTab('tabNodes')">
       <span class="icon">🛰️</span>
       <span class="label">Fleet</span>
-    </button>
-    <button class="bottom-nav-item" data-tab="tabSettings" onclick="switchTab('tabSettings')">
-      <span class="icon">⚙️</span>
-      <span class="label">Settings</span>
     </button>
     <button class="bottom-nav-item" data-tab="tabLogs" onclick="switchTab('tabLogs')">
       <span class="icon">📋</span>

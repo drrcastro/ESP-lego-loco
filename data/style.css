@@ -615,61 +615,308 @@ body {
 }
 
 /* =================================================================
-   Scenario Editor Layout
+   CTC Synoptic Circuit Map
    ================================================================= */
-.scenario-layout {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 1.25rem;
-}
-
-.scenario-sidebar {
+.synoptic-legend {
   display: flex;
-  flex-direction: column;
-}
-
-.file-list {
-  list-style: none;
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 1rem;
-}
-
-.file-item {
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-family: var(--font-mono);
+  flex-wrap: wrap;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  margin-bottom: 4px;
+}
+
+.legend-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-clear { background: #00d2ff; box-shadow: 0 0 6px rgba(0, 210, 255, 0.6); }
+.dot-occupied { background: #ff3366; box-shadow: 0 0 6px rgba(255, 51, 102, 0.8); }
+.dot-switch { background: #ffb300; }
+.dot-platform { background: #9d4edd; }
+.dot-beacon { background: #00f29b; }
+
+.synoptic-map-wrapper {
+  width: 100%;
+  min-height: 380px;
+  background: radial-gradient(circle at 50% 50%, #101626 0%, #080c14 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+  margin-bottom: 12px;
+}
+
+.synoptic-svg {
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+  display: block;
+}
+
+/* SVG Track Elements */
+.svg-track-rail {
+  fill: none;
+  stroke: #1b263b;
+  stroke-width: 14;
+  stroke-linecap: round;
+}
+
+.svg-track-line {
+  fill: none;
+  stroke: #00d2ff;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke 0.3s ease, filter 0.3s ease;
+}
+
+.svg-track-line.occupied {
+  stroke: #ff3366;
+  filter: url(#glowRed);
+}
+
+.svg-track-siding {
+  fill: none;
+  stroke: #3a86ff;
+  stroke-width: 4;
+  stroke-dasharray: 6 3;
+}
+
+.svg-switch-node {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.svg-switch-node:hover circle {
+  fill: #ffb300;
+  filter: drop-shadow(0 0 8px rgba(255, 179, 0, 0.8));
+}
+
+.svg-station-platform {
+  fill: rgba(157, 78, 221, 0.15);
+  stroke: #9d4edd;
+  stroke-width: 1.5;
+  rx: 4;
+}
+
+.svg-station-text {
+  fill: #e0aaff;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.svg-beacon-marker {
+  fill: #00f29b;
+  stroke: #090d16;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.svg-train-body {
+  fill: #ffb300;
+  stroke: #fff;
+  stroke-width: 1.5;
+  rx: 5;
+  filter: drop-shadow(0 0 10px rgba(255, 179, 0, 0.7));
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.svg-train-text {
+  fill: #090d16;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.synoptic-status-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.train-status-badge {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+
+/* =================================================================
+   Advanced Configuration Studio
+   ================================================================= */
+.config-subtabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}
+
+.config-subtab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
   transition: var(--transition);
 }
 
-.file-item:hover {
+.config-subtab-btn:hover {
   background: var(--bg-panel);
   color: #fff;
 }
 
-.file-item.active {
-  background: rgba(0, 210, 255, 0.15);
+.config-subtab-btn.active {
+  background: rgba(0, 210, 255, 0.12);
+  border-color: rgba(0, 210, 255, 0.3);
   color: var(--primary);
+}
+
+.config-subtab-pane {
+  display: none;
+}
+
+.config-subtab-pane.active {
+  display: block;
+}
+
+.config-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+.config-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.config-card h3 {
+  font-size: 1.05rem;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.card-desc {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.config-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.form-control {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.field-hint {
+  display: block;
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* Beacon List Table */
+.beacon-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.beacon-config-table th, .beacon-config-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.beacon-config-table th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.badge-role {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
-.scenario-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.badge-role-arrival {
+  background: rgba(157, 78, 221, 0.2);
+  color: #c77dff;
+  border: 1px solid rgba(157, 78, 221, 0.4);
 }
 
-.scenario-title-area {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.badge-role-locator {
+  background: rgba(0, 242, 155, 0.15);
+  color: #00f29b;
+  border: 1px solid rgba(0, 242, 155, 0.3);
 }
 
 .input-inline {
@@ -822,7 +1069,7 @@ body {
 }
 
 @media (max-width: 900px) {
-  .scenario-layout {
+  .config-grid-layout {
     grid-template-columns: 1fr;
   }
   .header {

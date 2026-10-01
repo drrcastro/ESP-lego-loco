@@ -1,5 +1,5 @@
 // =================================================================
-// ESP Lego Loco Web Serial Flasher & Live Monitor V2.0
+// ESP Lego Loco Web Serial Flasher & Live Monitor
 // =================================================================
 
 let serialPort = null;

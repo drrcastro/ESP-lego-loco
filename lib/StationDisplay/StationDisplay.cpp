@@ -26,7 +26,7 @@ bool StationDisplay::begin(uint8_t sdaPin, uint8_t sclPin, uint8_t i2cAddr) {
     _oled->setTextColor(SSD1306_BLACK);
     _oled->setCursor(8, 4);
     _oled->setTextSize(1);
-    _oled->print(F("LEGO LOCO V2.0"));
+    _oled->print(F("LEGO LOCO"));
 
     _oled->setTextColor(SSD1306_WHITE);
     _oled->setCursor(10, 28);

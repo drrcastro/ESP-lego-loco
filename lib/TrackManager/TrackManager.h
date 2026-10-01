@@ -9,6 +9,22 @@
   #include <Servo.h>
 #endif
 
+#define MAX_TRACK_SWITCHES 4
+
+struct TrackSwitchDevice {
+    uint8_t id = 1;              // Switch ID (e.g. 1, 2...)
+    uint8_t gpioPin = 255;       // GPIO pin connected to servo
+    uint8_t straightAngle = 75;  // Straight position angle
+    uint8_t turnoutAngle = 105;  // Turnout position angle
+    SwitchState currentState = SWITCH_STRAIGHT;
+    SwitchState targetState = SWITCH_STRAIGHT;
+    float currentAngle = 75.0f;
+    float targetAngle = 75.0f;
+    bool isMoving = false;
+    uint32_t motionStartMs = 0;
+    Servo servo;
+};
+
 class TrackManager {
 public:
     using DwellCompleteCallback = std::function<void()>;
@@ -16,15 +32,26 @@ public:
 
     TrackManager();
 
-    // Initialize track switch servo pin
+    // Initialize track switch servo pin (default primary switch)
     bool beginSwitch(uint8_t servoPin, uint8_t straightAngle = 75, uint8_t turnoutAngle = 105);
+
+    // Add additional switch identified by ID and GPIO
+    bool addSwitch(uint8_t id, uint8_t servoPin, uint8_t straightAngle = 75, uint8_t turnoutAngle = 105);
 
     // Initialize auxiliary beam break digital pin (if not using IR receiver)
     bool beginAuxOccupancyPin(uint8_t digitalPin, bool activeLow = true);
 
-    // Command switch position
+    // Command switch position (default switch 0)
     void setSwitchPosition(SwitchState state, bool immediate = false);
-    SwitchState getSwitchPosition() const { return _currentState; }
+
+    // Command specific switch position by index
+    void setSwitchPosition(uint8_t switchIndex, SwitchState state, bool immediate = false);
+
+    SwitchState getSwitchPosition(uint8_t switchIndex = 0) const;
+    size_t getSwitchCount() const { return _switchCount; }
+    const TrackSwitchDevice* getSwitch(uint8_t switchIndex) const {
+        return (switchIndex < _switchCount) ? &_switches[switchIndex] : nullptr;
+    }
 
     // Station Dwell Countdown
     void startDwellCountdown(uint16_t dwellSeconds);
@@ -44,17 +71,8 @@ public:
     void update();
 
 private:
-    Servo   _servo;
-    uint8_t _servoPin = 255;
-    uint8_t _straightAngle = 75;
-    uint8_t _turnoutAngle = 105;
-
-    SwitchState _currentState = SWITCH_STRAIGHT;
-    SwitchState _targetState = SWITCH_STRAIGHT;
-    float   _currentAngle = 75.0f;
-    float   _targetAngle = 75.0f;
-    bool    _isMoving = false;
-    uint32_t _motionStartMs = 0;
+    TrackSwitchDevice _switches[MAX_TRACK_SWITCHES];
+    uint8_t _switchCount = 0;
 
     uint8_t _auxPin = 255;
     bool    _auxActiveLow = true;

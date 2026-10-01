@@ -8,6 +8,7 @@ Compiles all 3 profiles across supported ESP chipsets:
 """
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -21,9 +22,20 @@ ENVIRONMENTS = [
     ("track_esp8266", "Track & Station (ESP8266 D1 Mini)"),
 ]
 
+def get_pio_cmd():
+    which_pio = shutil.which("pio")
+    if which_pio:
+        return which_pio
+    default_win_pio = os.path.expanduser(r"~/.platformio/penv/Scripts/pio.exe")
+    if os.path.exists(default_win_pio):
+        return default_win_pio
+    return "pio"
+
 def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(root_dir)
+
+    pio_bin = get_pio_cmd()
 
     print("=" * 60)
     print("  ESP LEGO LOCO - BATCH COMPILATION FOR WEB FLASHER")
@@ -34,7 +46,7 @@ def main():
 
     for env_name, description in ENVIRONMENTS:
         print(f"\n[BUILD] Target: {env_name} ({description})...")
-        cmd = ["pio", "run", "-e", env_name]
+        cmd = [pio_bin, "run", "-e", env_name]
         ret = subprocess.run(cmd)
         if ret.returncode == 0:
             print(f"[OK] {env_name} successfully built!")

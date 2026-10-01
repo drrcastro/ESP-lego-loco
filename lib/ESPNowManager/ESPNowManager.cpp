@@ -181,7 +181,7 @@ void ESPNowManager::announcePresence() {
     msg.nodeType = (uint8_t)_role;
     strncpy(msg.nodeId, _nodeId, sizeof(msg.nodeId) - 1);
     memcpy(msg.mac, _ownMac, 6);
-    msg.firmwareVersion = 0x0200; // v2.0
+    msg.firmwareVersion = 0x0100;
     msg.capabilities = 0xFF;
     msg.isPaired = _isPaired ? 1 : 0;
     if (_hasMasterMac) {
@@ -232,6 +232,30 @@ bool ESPNowManager::pairNode(const char* targetNodeId) {
         if (_onNodeEventCb) _onNodeEventCb(*n, false);
     }
     return ok;
+}
+
+bool ESPNowManager::unpairNode(const char* targetNodeId) {
+    DiscoveredNode* n = findNode(targetNodeId);
+    if (!n) {
+        Serial.printf("[ESP-NOW] Cannot unpair unknown node: %s\n", targetNodeId);
+        return false;
+    }
+    MsgUnpair unpair = {};
+    unpair.msgType = MSG_UNPAIR;
+    strncpy(unpair.targetNodeId, targetNodeId, sizeof(unpair.targetNodeId) - 1);
+    memcpy(unpair.masterMac, _ownMac, 6);
+
+    // Send both unicast to node MAC and broadcast to ensure delivery
+    sendUnicast(n->mac, &unpair, sizeof(unpair));
+    sendBroadcast(&unpair, sizeof(unpair));
+
+    n->isPaired = false;
+    n->isBondedOther = false;
+    memset(n->pairedMasterMac, 0, 6);
+    Serial.printf("[ESP-NOW] Sent UNPAIR command to %s\n", targetNodeId);
+
+    if (_onNodeEventCb) _onNodeEventCb(*n, false);
+    return true;
 }
 
 void ESPNowManager::sendHeartbeat() {
@@ -330,8 +354,14 @@ void ESPNowManager::setNodeFriendlyName(const char* nodeId, const char* name) {
 void ESPNowManager::update() {
     uint32_t now = millis();
 
-    // Regular heartbeat transmission (every 2.5s)
-    if (_role != NODE_TYPE_MASTER) {
+    // Regular heartbeat transmission
+    // Master broadcasts keepalive heartbeat every 1000ms; client nodes send every 2500ms
+    if (_role == NODE_TYPE_MASTER) {
+        if (now - _lastHeartbeatMs >= 1000) {
+            _lastHeartbeatMs = now;
+            sendHeartbeat();
+        }
+    } else {
         if (now - _lastHeartbeatMs >= 2500) {
             _lastHeartbeatMs = now;
             sendHeartbeat();
@@ -397,5 +427,7 @@ void ESPNowManager::handleEspNowRecv(const uint8_t *mac, const uint8_t *data, in
 }
 
 void ESPNowManager::handleEspNowSend(const uint8_t *mac, uint8_t status) {
-    // Optional transmission status logging
+    if (instance()._onSendCb) {
+        instance()._onSendCb(mac, (status == 0));
+    }
 }

@@ -36,6 +36,7 @@ class ESPNowManager {
 public:
     using MessageCallback = std::function<void(const uint8_t* mac, const uint8_t* data, int len)>;
     using NodeEventCallback = std::function<void(const DiscoveredNode& node, bool isNew)>;
+    using SendStatusCallback = std::function<void(const uint8_t* mac, bool success)>;
 
     static ESPNowManager& instance();
 
@@ -61,6 +62,7 @@ public:
     void announcePresence();
     void sendDiscoveryScan();
     bool pairNode(const char* targetNodeId);
+    bool unpairNode(const char* targetNodeId);
     void setPairedState(bool paired, const uint8_t* masterMac = nullptr);
     bool isPaired() const { return _isPaired; }
     void sendHeartbeat();
@@ -74,6 +76,7 @@ public:
     // Callbacks
     void onReceive(MessageCallback cb) { _onReceiveCb = cb; }
     void onNodeEvent(NodeEventCallback cb) { _onNodeEventCb = cb; }
+    void onSend(SendStatusCallback cb) { _onSendCb = cb; }
 
     // Master specific
     void setMasterMac(const uint8_t* mac);
@@ -99,6 +102,7 @@ private:
     std::vector<DiscoveredNode> _nodes;
     MessageCallback _onReceiveCb = nullptr;
     NodeEventCallback _onNodeEventCb = nullptr;
+    SendStatusCallback _onSendCb = nullptr;
 
     uint32_t _lastHeartbeatMs = 0;
     uint32_t _lastCleanupMs = 0;

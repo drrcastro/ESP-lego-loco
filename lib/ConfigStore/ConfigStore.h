@@ -10,21 +10,63 @@
   #include <LittleFS.h>
 #endif
 
-struct ScenarioStep {
-    uint16_t stepId = 0;
-    String   triggerType;   // "START", "IR_BEACON", "TRACK_OCCUPIED", "TRACK_CLEARED", "TIMER"
-    String   triggerValue;  // e.g. "5", "TRACK_1A2B", "3000"
-    String   targetNode;    // e.g. "LOCO_4B5C", "TRACK_1A2B", "ALL"
-    String   action;        // "SET_SPEED", "SET_SWITCH", "SET_LIGHTS", "DWELL_WAIT", "EMERGENCY_STOP", "GOTO_STEP"
-    String   parameter;     // e.g. "30", "TURNOUT", "STRAIGHT", "CAB_ON", "5000", "1"
-};
+// =================================================================
+// Configuration Structures
+// =================================================================
 
 struct SystemSettings {
+    String  layoutName = "Lego Central Layout";
     String  wifiSsid = "LegoTrain_Master";
     String  wifiPassword = ""; // Open or WPA2
     bool    apMode = true;     // true = Access Point, false = Station
     uint8_t wifiChannel = 1;
-    String  activeScenario = "default.csv";
+    uint16_t headwaySafeSec = 12;
+    uint16_t headwayCautionSec = 6;
+    uint8_t  headwaySpeedTrimPct = 40;
+};
+
+struct LocoParamConfig {
+    String  nodeId;
+    String  name;
+    int8_t  maxSpeed = 70;
+    uint8_t learningSpeed = 35;
+    float   accelRate = 40.0f;
+    float   decelRate = 60.0f;
+    uint16_t brakeOffsetMs = 450;
+    uint16_t dwellTimeSec = 10;
+    String  lightMode = "AUTO";
+    uint16_t measuredLengthCm = 0;
+};
+
+struct StationBeaconParam {
+    uint16_t beaconId = 0;
+    uint8_t  gpioPin = 19; // GPIO associated with beacon (IR emitter or optical sensor)
+    uint8_t  role = 0; // 0=LOCATOR, 1=STATION_ARRIVAL, 2=APPROACH, 3=DEPARTURE, 4=SIDING
+    String   description;
+    bool     measureTrainLength = true;
+    uint16_t dwellSec = 10;
+};
+
+struct StationSwitchParam {
+    uint8_t  switchId = 1;        // Switch ID (e.g. 1, 2...)
+    uint8_t  gpioPin = 18;        // GPIO pin connected to servo motor (e.g. 18, 25...)
+    uint8_t  servoStraightAngle = 75;  // Servo straight angle
+    uint8_t  servoTurnoutAngle = 105;  // Servo turnout angle
+    String   defaultPosition = "STRAIGHT"; // "STRAIGHT" or "TURNOUT"
+    String   description;         // Friendly description (e.g. "North Entry Turnout")
+};
+
+struct StationParamConfig {
+    String  nodeId;
+    String  name;
+    String  defaultSwitch = "STRAIGHT"; // "STRAIGHT" or "TURNOUT"
+    uint8_t servoStraightAngle = 75;
+    uint8_t servoTurnoutAngle = 105;
+    uint8_t switchGpioPin = 18; // Primary switch GPIO
+    uint16_t dwellTimeSec = 10;
+    bool    autoDivertOnOccupied = true;
+    std::vector<StationBeaconParam> beacons;
+    std::vector<StationSwitchParam> switches;
 };
 
 class ConfigStore {
@@ -39,28 +81,35 @@ public:
     bool saveSettings();
     bool loadSettings();
 
-    // Friendly Node Names Mapping
+    // Node Friendly Names
     String getFriendlyName(const String& nodeId);
     void setFriendlyName(const String& nodeId, const String& name);
     bool saveNodeMappings();
     bool loadNodeMappings();
     const std::map<String, String>& getAllNodeMappings() const { return _nodeNames; }
 
-    // Scenario CSV Manager
-    std::vector<String> listScenarios();
-    bool loadScenario(const String& filename, std::vector<ScenarioStep>& steps);
-    bool saveScenario(const String& filename, const String& csvContent);
-    bool saveScenarioSteps(const String& filename, const std::vector<ScenarioStep>& steps);
-    bool deleteScenario(const String& filename);
-    String readScenarioRaw(const String& filename);
+    // Locomotive Configurations
+    bool hasLocoConfig(const String& nodeId) const;
+    LocoParamConfig getLocoConfig(const String& nodeId);
+    void setLocoConfig(const LocoParamConfig& cfg);
+    bool removeLoco(const String& nodeId);
+    const std::vector<LocoParamConfig>& getAllLocos() const { return _locos; }
 
-    // CSV Parsing Helpers
-    static bool parseCsvLine(const String& line, ScenarioStep& step);
-    static String stepToCsvLine(const ScenarioStep& step);
-    static String getCsvHeader();
+    // Station Configurations
+    bool hasStationConfig(const String& nodeId) const;
+    StationParamConfig getStationConfig(const String& nodeId);
+    void setStationConfig(const StationParamConfig& cfg);
+    const std::vector<StationParamConfig>& getAllStations() const { return _stations; }
 
-    // Default Scenarios
-    void createDefaultScenarioIfNotExists();
+    // Unified Master Configuration JSON (/config/config.json)
+    bool loadUnifiedConfig();
+    bool saveUnifiedConfig();
+    String serializeUnifiedConfigJson();
+    bool deserializeUnifiedConfigJson(const String& jsonStr);
+
+    // Topology Map JSON (/config/topology.json)
+    bool saveTopologyJson(const String& jsonStr);
+    String loadTopologyJson();
 
 private:
     ConfigStore();
@@ -69,8 +118,13 @@ private:
     bool _fsMounted = false;
     SystemSettings _settings;
     std::map<String, String> _nodeNames;
+    std::vector<LocoParamConfig> _locos;
+    std::vector<StationParamConfig> _stations;
 
-    const char* SETTINGS_PATH = "/config/settings.json";
-    const char* NODES_PATH    = "/config/nodes.json";
-    const char* SCENARIOS_DIR = "/scenarios";
+    const char* CONFIG_PATH    = "/config/config.json";
+    const char* SETTINGS_PATH  = "/config/settings.json";
+    const char* NODES_PATH     = "/config/nodes.json";
+    const char* TOPOLOGY_PATH  = "/config/topology.json";
+
+    void initDefaultConfig();
 };

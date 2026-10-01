@@ -25,121 +25,73 @@ bool ConfigStore::begin() {
     if (!LittleFS.exists("/config")) {
         LittleFS.mkdir("/config");
     }
-    if (!LittleFS.exists(SCENARIOS_DIR)) {
-        LittleFS.mkdir(SCENARIOS_DIR);
+
+    if (!loadUnifiedConfig()) {
+        initDefaultConfig();
+        saveUnifiedConfig();
     }
 
-    if (!loadSettings()) {
-        saveSettings();
-    }
-    if (!loadNodeMappings()) {
-        saveNodeMappings();
-    }
-    createDefaultScenarioIfNotExists();
-
+    loadNodeMappings();
     return true;
 }
 
-String ConfigStore::getCsvHeader() {
-    return String("STEP_ID, TRIGGER_TYPE, TRIGGER_VALUE, TARGET_NODE, ACTION, PARAMETER");
-}
+void ConfigStore::initDefaultConfig() {
+    _settings = SystemSettings();
 
-bool ConfigStore::parseCsvLine(const String& line, ScenarioStep& step) {
-    String cleanLine = line;
-    cleanLine.trim();
-    if (cleanLine.length() == 0 || cleanLine.startsWith("#")) return false;
+    // Default Station 1
+    StationParamConfig st1;
+    st1.nodeId = "TRACK_1A2B";
+    st1.name = "Central Station";
+    st1.defaultSwitch = "STRAIGHT";
+    st1.servoStraightAngle = 75;
+    st1.servoTurnoutAngle = 105;
+    st1.dwellTimeSec = 10;
+    st1.autoDivertOnOccupied = true;
 
-    // Check if line is the header
-    if (cleanLine.indexOf("TRIGGER_TYPE") >= 0 || cleanLine.indexOf("STEP_ID") >= 0) {
-        return false;
-    }
+    StationBeaconParam b1;
+    b1.beaconId = 10;
+    b1.role = 0; // ROLE_LOCATOR
+    b1.description = "Sector Approach Tracker";
+    b1.measureTrainLength = true;
+    b1.dwellSec = 0;
+    st1.beacons.push_back(b1);
 
-    std::vector<String> tokens;
-    int startIndex = 0;
-    while (startIndex < cleanLine.length()) {
-        int commaIndex = cleanLine.indexOf(',', startIndex);
-        if (commaIndex == -1) {
-            String token = cleanLine.substring(startIndex);
-            token.trim();
-            tokens.push_back(token);
-            break;
-        } else {
-            String token = cleanLine.substring(startIndex, commaIndex);
-            token.trim();
-            tokens.push_back(token);
-            startIndex = commaIndex + 1;
-        }
-    }
+    StationBeaconParam b2;
+    b2.beaconId = 11;
+    b2.role = 1; // ROLE_STATION_ARRIVAL
+    b2.description = "Platform 1 Arrival Stop";
+    b2.measureTrainLength = false;
+    b2.dwellSec = 10;
+    st1.beacons.push_back(b2);
 
-    if (tokens.size() < 6) return false;
+    _stations.push_back(st1);
 
-    step.stepId       = tokens[0].toInt();
-    step.triggerType  = tokens[1];
-    step.triggerValue = tokens[2];
-    step.targetNode   = tokens[3];
-    step.action       = tokens[4];
-    step.parameter    = tokens[5];
-
-    return true;
-}
-
-String ConfigStore::stepToCsvLine(const ScenarioStep& step) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "%u, %s, %s, %s, %s, %s",
-             step.stepId,
-             step.triggerType.c_str(),
-             step.triggerValue.c_str(),
-             step.targetNode.c_str(),
-             step.action.c_str(),
-             step.parameter.c_str());
-    return String(buf);
+    // Default Loco 1
+    LocoParamConfig l1;
+    l1.nodeId = "LOCO_4B5C";
+    l1.name = "Express Loco";
+    l1.maxSpeed = 70;
+    l1.learningSpeed = 35;
+    l1.accelRate = 40.0f;
+    l1.decelRate = 60.0f;
+    l1.brakeOffsetMs = 450;
+    l1.dwellTimeSec = 10;
+    l1.lightMode = "AUTO";
+    l1.measuredLengthCm = 0;
+    _locos.push_back(l1);
 }
 
 void ConfigStore::setSettings(const SystemSettings& settings) {
     _settings = settings;
-    saveSettings();
+    saveUnifiedConfig();
 }
 
 bool ConfigStore::saveSettings() {
-    if (!_fsMounted) return false;
-
-    JsonDocument doc;
-    doc["wifiSsid"]       = _settings.wifiSsid;
-    doc["wifiPassword"]   = _settings.wifiPassword;
-    doc["apMode"]         = _settings.apMode;
-    doc["wifiChannel"]    = _settings.wifiChannel;
-    doc["activeScenario"] = _settings.activeScenario;
-
-    File file = LittleFS.open(SETTINGS_PATH, "w");
-    if (!file) return false;
-
-    serializeJson(doc, file);
-    file.close();
-    return true;
+    return saveUnifiedConfig();
 }
 
 bool ConfigStore::loadSettings() {
-    if (!_fsMounted || !LittleFS.exists(SETTINGS_PATH)) return false;
-
-    File file = LittleFS.open(SETTINGS_PATH, "r");
-    if (!file) return false;
-
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, file);
-    file.close();
-
-    if (err) return false;
-
-    if (doc["wifiSsid"].is<const char*>()) _settings.wifiSsid = doc["wifiSsid"].as<String>();
-    if (doc["wifiPassword"].is<const char*>()) _settings.wifiPassword = doc["wifiPassword"].as<String>();
-    if (doc["apMode"].is<bool>()) _settings.apMode = doc["apMode"].as<bool>();
-    if (doc["wifiChannel"].is<uint8_t>()) _settings.wifiChannel = doc["wifiChannel"].as<uint8_t>();
-    if (doc["activeScenario"].is<const char*>()) _settings.activeScenario = doc["activeScenario"].as<String>();
-
-    if (_settings.wifiSsid.length() == 0) _settings.wifiSsid = "LegoTrain_Master";
-    if (_settings.wifiChannel < 1 || _settings.wifiChannel > 13) _settings.wifiChannel = 1;
-
-    return true;
+    return loadUnifiedConfig();
 }
 
 String ConfigStore::getFriendlyName(const String& nodeId) {
@@ -147,164 +99,344 @@ String ConfigStore::getFriendlyName(const String& nodeId) {
     if (it != _nodeNames.end()) {
         return it->second;
     }
+    for (const auto& l : _locos) {
+        if (l.nodeId == nodeId && l.name.length() > 0) return l.name;
+    }
+    for (const auto& s : _stations) {
+        if (s.nodeId == nodeId && s.name.length() > 0) return s.name;
+    }
     return nodeId;
 }
 
 void ConfigStore::setFriendlyName(const String& nodeId, const String& name) {
     _nodeNames[nodeId] = name;
+    for (auto& l : _locos) {
+        if (l.nodeId == nodeId) { l.name = name; break; }
+    }
+    for (auto& s : _stations) {
+        if (s.nodeId == nodeId) { s.name = name; break; }
+    }
     saveNodeMappings();
+    saveUnifiedConfig();
 }
 
 bool ConfigStore::saveNodeMappings() {
     if (!_fsMounted) return false;
+    File f = LittleFS.open(NODES_PATH, "w");
+    if (!f) return false;
 
     JsonDocument doc;
-    JsonObject obj = doc.to<JsonObject>();
     for (const auto& pair : _nodeNames) {
-        obj[pair.first] = pair.second;
+        doc[pair.first] = pair.second;
     }
-
-    File file = LittleFS.open(NODES_PATH, "w");
-    if (!file) return false;
-
-    serializeJson(doc, file);
-    file.close();
+    serializeJson(doc, f);
+    f.close();
     return true;
 }
 
 bool ConfigStore::loadNodeMappings() {
     if (!_fsMounted || !LittleFS.exists(NODES_PATH)) return false;
-
-    File file = LittleFS.open(NODES_PATH, "r");
-    if (!file) return false;
+    File f = LittleFS.open(NODES_PATH, "r");
+    if (!f) return false;
 
     JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, file);
-    file.close();
-
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
     if (err) return false;
 
     _nodeNames.clear();
-    for (JsonPair kv : doc.as<JsonObject>()) {
-        _nodeNames[kv.key().c_str()] = kv.value().as<String>();
+    JsonObject obj = doc.as<JsonObject>();
+    for (JsonPair p : obj) {
+        _nodeNames[p.key().c_str()] = p.value().as<String>();
     }
     return true;
 }
 
-std::vector<String> ConfigStore::listScenarios() {
-    std::vector<String> list;
-    if (!_fsMounted) return list;
-
-#if defined(ESP32)
-    File dir = LittleFS.open(SCENARIOS_DIR);
-    if (!dir || !dir.isDirectory()) return list;
-
-    File file = dir.openNextFile();
-    while (file) {
-        String fname = file.name();
-        // Remove leading directory path if present
-        int lastSlash = fname.lastIndexOf('/');
-        if (lastSlash >= 0) fname = fname.substring(lastSlash + 1);
-
-        if (fname.endsWith(".csv")) {
-            list.push_back(fname);
-        }
-        file = dir.openNextFile();
+bool ConfigStore::hasLocoConfig(const String& nodeId) const {
+    for (const auto& l : _locos) {
+        if (l.nodeId == nodeId) return true;
     }
-#elif defined(ESP8266)
-    Dir dir = LittleFS.openDir(SCENARIOS_DIR);
-    while (dir.next()) {
-        String fname = dir.fileName();
-        int lastSlash = fname.lastIndexOf('/');
-        if (lastSlash >= 0) fname = fname.substring(lastSlash + 1);
-
-        if (fname.endsWith(".csv")) {
-            list.push_back(fname);
-        }
-    }
-#endif
-    return list;
+    return false;
 }
 
-String ConfigStore::readScenarioRaw(const String& filename) {
-    String path = String(SCENARIOS_DIR) + "/" + filename;
-    if (!_fsMounted || !LittleFS.exists(path)) return String();
-
-    File file = LittleFS.open(path, "r");
-    if (!file) return String();
-
-    String content = file.readString();
-    file.close();
-    return content;
+LocoParamConfig ConfigStore::getLocoConfig(const String& nodeId) {
+    for (const auto& l : _locos) {
+        if (l.nodeId == nodeId) return l;
+    }
+    LocoParamConfig def;
+    def.nodeId = nodeId;
+    def.name = getFriendlyName(nodeId);
+    return def;
 }
 
-bool ConfigStore::loadScenario(const String& filename, std::vector<ScenarioStep>& steps) {
-    String path = String(SCENARIOS_DIR) + "/" + filename;
-    if (!_fsMounted || !LittleFS.exists(path)) return false;
-
-    File file = LittleFS.open(path, "r");
-    if (!file) return false;
-
-    steps.clear();
-    while (file.available()) {
-        String line = file.readStringUntil('\n');
-        ScenarioStep step;
-        if (parseCsvLine(line, step)) {
-            steps.push_back(step);
+void ConfigStore::setLocoConfig(const LocoParamConfig& cfg) {
+    for (auto& l : _locos) {
+        if (l.nodeId == cfg.nodeId) {
+            l = cfg;
+            saveUnifiedConfig();
+            return;
         }
     }
-    file.close();
+    _locos.push_back(cfg);
+    saveUnifiedConfig();
+}
+
+bool ConfigStore::removeLoco(const String& nodeId) {
+    bool removed = false;
+    for (auto it = _locos.begin(); it != _locos.end(); ) {
+        if (it->nodeId == nodeId) {
+            it = _locos.erase(it);
+            removed = true;
+        } else {
+            ++it;
+        }
+    }
+    _nodeNames.erase(nodeId);
+    saveNodeMappings();
+    saveUnifiedConfig();
+    return removed;
+}
+
+bool ConfigStore::hasStationConfig(const String& nodeId) const {
+    for (const auto& s : _stations) {
+        if (s.nodeId == nodeId) return true;
+    }
+    return false;
+}
+
+StationParamConfig ConfigStore::getStationConfig(const String& nodeId) {
+    for (const auto& s : _stations) {
+        if (s.nodeId == nodeId) return s;
+    }
+    StationParamConfig def;
+    def.nodeId = nodeId;
+    def.name = getFriendlyName(nodeId);
+    return def;
+}
+
+void ConfigStore::setStationConfig(const StationParamConfig& cfg) {
+    for (auto& s : _stations) {
+        if (s.nodeId == cfg.nodeId) {
+            s = cfg;
+            saveUnifiedConfig();
+            return;
+        }
+    }
+    _stations.push_back(cfg);
+    saveUnifiedConfig();
+}
+
+String ConfigStore::serializeUnifiedConfigJson() {
+    JsonDocument doc;
+
+    // System Settings
+    JsonObject sys = doc["system"].to<JsonObject>();
+    sys["layoutName"]          = _settings.layoutName;
+    sys["wifiSsid"]            = _settings.wifiSsid;
+    sys["wifiPassword"]        = _settings.wifiPassword;
+    sys["apMode"]              = _settings.apMode;
+    sys["wifiChannel"]         = _settings.wifiChannel;
+    sys["headwaySafeSec"]      = _settings.headwaySafeSec;
+    sys["headwayCautionSec"]   = _settings.headwayCautionSec;
+    sys["headwaySpeedTrimPct"] = _settings.headwaySpeedTrimPct;
+
+    // Locomotives Array
+    JsonArray locosArr = doc["locomotives"].to<JsonArray>();
+    for (const auto& l : _locos) {
+        JsonObject lo = locosArr.add<JsonObject>();
+        lo["nodeId"]           = l.nodeId;
+        lo["name"]             = l.name;
+        lo["maxSpeed"]         = l.maxSpeed;
+        lo["learningSpeed"]    = l.learningSpeed;
+        lo["accelRate"]        = l.accelRate;
+        lo["decelRate"]        = l.decelRate;
+        lo["brakeOffsetMs"]    = l.brakeOffsetMs;
+        lo["dwellTimeSec"]     = l.dwellTimeSec;
+        lo["lightMode"]        = l.lightMode;
+        lo["measuredLengthCm"] = l.measuredLengthCm;
+    }
+
+    // Stations Array
+    JsonArray stationsArr = doc["stations"].to<JsonArray>();
+    for (const auto& s : _stations) {
+        JsonObject so = stationsArr.add<JsonObject>();
+        so["nodeId"]               = s.nodeId;
+        so["name"]                 = s.name;
+        so["defaultSwitch"]         = s.defaultSwitch;
+        so["servoStraightAngle"]   = s.servoStraightAngle;
+        so["servoTurnoutAngle"]    = s.servoTurnoutAngle;
+        so["dwellTimeSec"]         = s.dwellTimeSec;
+        so["autoDivertOnOccupied"] = s.autoDivertOnOccupied;
+        so["beaconCount"]          = s.beacons.size();
+
+        JsonArray bArr = so["beacons"].to<JsonArray>();
+        for (const auto& b : s.beacons) {
+            JsonObject bo = bArr.add<JsonObject>();
+            bo["beaconId"]           = b.beaconId;
+            bo["gpioPin"]            = b.gpioPin;
+            bo["role"]               = b.role;
+            bo["description"]        = b.description;
+            bo["measureTrainLength"] = b.measureTrainLength;
+            bo["dwellSec"]           = b.dwellSec;
+        }
+
+        JsonArray swArr = so["switches"].to<JsonArray>();
+        for (const auto& sw : s.switches) {
+            JsonObject swo = swArr.add<JsonObject>();
+            swo["switchId"]           = sw.switchId;
+            swo["gpioPin"]            = sw.gpioPin;
+            swo["servoStraightAngle"] = sw.servoStraightAngle;
+            swo["servoTurnoutAngle"]  = sw.servoTurnoutAngle;
+            swo["defaultPosition"]    = sw.defaultPosition;
+            swo["description"]        = sw.description;
+        }
+    }
+
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+bool ConfigStore::deserializeUnifiedConfigJson(const String& jsonStr) {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, jsonStr);
+    if (err) {
+        Serial.printf("[ConfigStore] deserializeJson failed: %s\n", err.c_str());
+        return false;
+    }
+
+    // System Settings
+    if (doc["system"].is<JsonObject>()) {
+        JsonObject sys = doc["system"].as<JsonObject>();
+        if (sys["layoutName"].is<const char*>()) _settings.layoutName = sys["layoutName"].as<String>();
+        if (sys["wifiSsid"].is<const char*>()) _settings.wifiSsid = sys["wifiSsid"].as<String>();
+        if (sys["wifiPassword"].is<const char*>()) _settings.wifiPassword = sys["wifiPassword"].as<String>();
+        if (sys["apMode"].is<bool>()) _settings.apMode = sys["apMode"].as<bool>();
+        if (sys["wifiChannel"].is<uint8_t>()) _settings.wifiChannel = sys["wifiChannel"].as<uint8_t>();
+        if (sys["headwaySafeSec"].is<uint16_t>()) _settings.headwaySafeSec = sys["headwaySafeSec"].as<uint16_t>();
+        if (sys["headwayCautionSec"].is<uint16_t>()) _settings.headwayCautionSec = sys["headwayCautionSec"].as<uint16_t>();
+        if (sys["headwaySpeedTrimPct"].is<uint8_t>()) _settings.headwaySpeedTrimPct = sys["headwaySpeedTrimPct"].as<uint8_t>();
+    }
+
+    // Locomotives
+    if (doc["locomotives"].is<JsonArray>()) {
+        _locos.clear();
+        for (JsonObject lo : doc["locomotives"].as<JsonArray>()) {
+            LocoParamConfig l;
+            l.nodeId           = lo["nodeId"] | "";
+            l.name             = lo["name"] | l.nodeId;
+            l.maxSpeed         = lo["maxSpeed"] | 70;
+            l.learningSpeed    = lo["learningSpeed"] | 35;
+            l.accelRate        = lo["accelRate"] | 40.0f;
+            l.decelRate        = lo["decelRate"] | 60.0f;
+            l.brakeOffsetMs    = lo["brakeOffsetMs"] | 450;
+            l.dwellTimeSec     = lo["dwellTimeSec"] | 10;
+            l.lightMode        = lo["lightMode"] | "AUTO";
+            l.measuredLengthCm = lo["measuredLengthCm"] | 0;
+            if (l.nodeId.length() > 0) {
+                _locos.push_back(l);
+                _nodeNames[l.nodeId] = l.name;
+            }
+        }
+    }
+
+    // Stations
+    if (doc["stations"].is<JsonArray>()) {
+        _stations.clear();
+        for (JsonObject so : doc["stations"].as<JsonArray>()) {
+            StationParamConfig s;
+            s.nodeId               = so["nodeId"] | "";
+            s.name                 = so["name"] | s.nodeId;
+            s.defaultSwitch        = so["defaultSwitch"] | "STRAIGHT";
+            s.servoStraightAngle   = so["servoStraightAngle"] | 75;
+            s.servoTurnoutAngle    = so["servoTurnoutAngle"] | 105;
+            s.dwellTimeSec         = so["dwellTimeSec"] | 10;
+            s.autoDivertOnOccupied = so["autoDivertOnOccupied"] | true;
+
+            if (so["beacons"].is<JsonArray>()) {
+                for (JsonObject bo : so["beacons"].as<JsonArray>()) {
+                    StationBeaconParam b;
+                    b.beaconId           = bo["beaconId"] | 0;
+                    b.gpioPin            = bo["gpioPin"] | 19;
+                    b.role               = bo["role"] | 0;
+                    b.description        = bo["description"] | "";
+                    b.measureTrainLength = bo["measureTrainLength"] | true;
+                    b.dwellSec           = bo["dwellSec"] | 10;
+                    s.beacons.push_back(b);
+                }
+            }
+
+            if (so["switches"].is<JsonArray>()) {
+                for (JsonObject swo : so["switches"].as<JsonArray>()) {
+                    StationSwitchParam sw;
+                    sw.switchId           = swo["switchId"] | 1;
+                    sw.gpioPin            = swo["gpioPin"] | 18;
+                    sw.servoStraightAngle = swo["servoStraightAngle"] | 75;
+                    sw.servoTurnoutAngle  = swo["servoTurnoutAngle"] | 105;
+                    sw.defaultPosition    = swo["defaultPosition"] | "STRAIGHT";
+                    sw.description        = swo["description"] | "";
+                    s.switches.push_back(sw);
+                }
+            } else {
+                StationSwitchParam defSw;
+                defSw.switchId = 1;
+                defSw.gpioPin = s.switchGpioPin;
+                defSw.servoStraightAngle = s.servoStraightAngle;
+                defSw.servoTurnoutAngle = s.servoTurnoutAngle;
+                defSw.defaultPosition = s.defaultSwitch;
+                defSw.description = "Main Turnout";
+                s.switches.push_back(defSw);
+            }
+
+            if (s.nodeId.length() > 0) {
+                _stations.push_back(s);
+                _nodeNames[s.nodeId] = s.name;
+            }
+        }
+    }
+
+    saveUnifiedConfig();
     return true;
 }
 
-bool ConfigStore::saveScenario(const String& filename, const String& csvContent) {
+bool ConfigStore::saveUnifiedConfig() {
     if (!_fsMounted) return false;
-    String cleanName = filename;
-    if (!cleanName.endsWith(".csv")) cleanName += ".csv";
-    String path = String(SCENARIOS_DIR) + "/" + cleanName;
-
-    File file = LittleFS.open(path, "w");
-    if (!file) return false;
-
-    file.print(csvContent);
-    file.close();
+    File f = LittleFS.open(CONFIG_PATH, "w");
+    if (!f) {
+        Serial.println(F("[ConfigStore] Error opening config.json for writing"));
+        return false;
+    }
+    String jsonStr = serializeUnifiedConfigJson();
+    f.print(jsonStr);
+    f.close();
+    Serial.println(F("[ConfigStore] Unified config saved successfully to LittleFS."));
     return true;
 }
 
-bool ConfigStore::saveScenarioSteps(const String& filename, const std::vector<ScenarioStep>& steps) {
-    String content = getCsvHeader() + "\n";
-    for (const auto& step : steps) {
-        content += stepToCsvLine(step) + "\n";
-    }
-    return saveScenario(filename, content);
+bool ConfigStore::loadUnifiedConfig() {
+    if (!_fsMounted || !LittleFS.exists(CONFIG_PATH)) return false;
+    File f = LittleFS.open(CONFIG_PATH, "r");
+    if (!f) return false;
+
+    String content = f.readString();
+    f.close();
+    return deserializeUnifiedConfigJson(content);
 }
 
-bool ConfigStore::deleteScenario(const String& filename) {
-    String path = String(SCENARIOS_DIR) + "/" + filename;
-    if (!_fsMounted || !LittleFS.exists(path)) return false;
-    return LittleFS.remove(path);
+bool ConfigStore::saveTopologyJson(const String& jsonStr) {
+    if (!_fsMounted) return false;
+    File f = LittleFS.open(TOPOLOGY_PATH, "w");
+    if (!f) return false;
+    f.print(jsonStr);
+    f.close();
+    return true;
 }
 
-void ConfigStore::createDefaultScenarioIfNotExists() {
-    String defaultPath = String(SCENARIOS_DIR) + "/default.csv";
-    if (LittleFS.exists(defaultPath)) return;
-
-    String demoCsv = 
-        "STEP_ID, TRIGGER_TYPE, TRIGGER_VALUE, TARGET_NODE, ACTION, PARAMETER\n"
-        "# Initial route setup on green signal\n"
-        "1, START, 0, TRACK_1, SET_SWITCH, STRAIGHT\n"
-        "2, START, 0, LOCO_1, SET_LIGHTS, AUTO\n"
-        "3, START, 0, LOCO_1, SET_SPEED, 50\n"
-        "# Approaching station approach beacon\n"
-        "4, IR_BEACON, 5, LOCO_1, SET_SPEED, 30\n"
-        "5, IR_BEACON, 5, TRACK_1, SET_SWITCH, TURNOUT\n"
-        "# Train arrives at platform\n"
-        "6, TRACK_OCCUPIED, TRACK_1, LOCO_1, SET_SPEED, 0\n"
-        "7, TRACK_OCCUPIED, TRACK_1, TRACK_1, DWELL_WAIT, 10\n"
-        "# Departure after platform dwell clearance\n"
-        "8, TRACK_CLEARED, TRACK_1, TRACK_1, SET_SWITCH, STRAIGHT\n"
-        "9, TRACK_CLEARED, TRACK_1, LOCO_1, SET_SPEED, 45\n";
-
-    saveScenario("default.csv", demoCsv);
-    Serial.println(F("[ConfigStore] Created default demonstration scenario 'default.csv'"));
+String ConfigStore::loadTopologyJson() {
+    if (!_fsMounted || !LittleFS.exists(TOPOLOGY_PATH)) return "{}";
+    File f = LittleFS.open(TOPOLOGY_PATH, "r");
+    if (!f) return "{}";
+    String content = f.readString();
+    f.close();
+    return content;
 }

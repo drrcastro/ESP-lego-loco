@@ -50,36 +50,62 @@ void LocoWebServer::handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 
         const char* cmd = doc["cmd"] | "";
 
-        if (strcmp(cmd, "loco_throttle") == 0) {
-            String target = doc["target"] | "ALL";
-            int8_t speed = doc["speed"] | 0;
+        if (strcmp(cmd, "loco_throttle") == 0 || strcmp(cmd, "set_loco_speed") == 0) {
+            String target = doc["target"] | (doc["nodeId"] | "ALL");
+            int8_t speed = doc["speed"] | (doc["targetSpeed"] | 0);
             uint8_t brake = doc["brake"] | 0;
             uint8_t lf = doc["lightsFront"] | 255;
             uint8_t lr = doc["lightsRear"] | 255;
             uint8_t lc = doc["lightsCab"] | 100;
             uint8_t lm = doc["lightMode"] | 1;
             if (_onLocoControlCb) _onLocoControlCb(target, speed, brake, lf, lr, lc, lm);
-        } else if (strcmp(cmd, "track_switch") == 0) {
-            String target = doc["target"] | "";
-            uint8_t pos = doc["position"] | 0;
+        } else if (strcmp(cmd, "track_switch") == 0 || strcmp(cmd, "set_switch") == 0) {
+            String target = doc["target"] | (doc["nodeId"] | "");
+            uint8_t pos = 0;
+            if (doc["switchPosition"].is<const char*>()) {
+                const char* pStr = doc["switchPosition"];
+                pos = (strcmp(pStr, "TURNOUT") == 0) ? 1 : 0;
+            } else {
+                pos = doc["position"] | (doc["switchPosition"] | 0);
+            }
             uint16_t dwell = doc["dwell"] | 0;
-            if (_onTrackControlCb) _onTrackControlCb(target, pos, dwell);
+            uint8_t swIdx = doc["switchIndex"] | (doc["switchId"] | 0);
+            if (_onTrackControlCb) _onTrackControlCb(target, pos, dwell, swIdx);
+        } else if (strcmp(cmd, "set_loco_lights") == 0) {
+            String target = doc["nodeId"] | "ALL";
+            const char* zone = doc["zone"] | "front";
+            uint8_t lf = (strcmp(zone, "front") == 0) ? 255 : 100;
+            uint8_t lr = (strcmp(zone, "rear") == 0) ? 255 : 0;
+            uint8_t lc = (strcmp(zone, "cab") == 0) ? 255 : 50;
+            if (_onLocoControlCb) _onLocoControlCb(target, -128, 0, lf, lr, lc, 0); // -128 = keep speed
         } else if (strcmp(cmd, "emergency_stop") == 0) {
             if (_onEmergencyStopCb) _onEmergencyStopCb();
         } else if (strcmp(cmd, "set_mode") == 0) {
             String mStr = doc["mode"] | "MANUAL";
-            _currentMode = (mStr == "AUTOMATIC") ? MODE_AUTOMATIC : MODE_MANUAL;
+            _currentMode = (mStr == "AUTONOMOUS" || mStr == "AUTOMATIC") ? MODE_AUTONOMOUS : MODE_MANUAL;
             if (_onModeChangeCb) _onModeChangeCb(_currentMode);
-        } else if (strcmp(cmd, "run_scenario") == 0) {
-            String scName = doc["scenario"] | "default.csv";
-            bool run = doc["run"] | true;
-            if (_onScenarioRunCb) _onScenarioRunCb(scName, run);
+        } else if (strcmp(cmd, "start_learning") == 0) {
+            String target = doc["target"] | (doc["targetLocoId"] | "ALL");
+            uint8_t speed = doc["speed"] | (doc["calibrationSpeed"] | 35);
+            if (_onLearningLapCb) _onLearningLapCb(target, true, speed);
+        } else if (strcmp(cmd, "stop_learning") == 0) {
+            String target = doc["target"] | (doc["targetLocoId"] | "ALL");
+            if (_onLearningLapCb) _onLearningLapCb(target, false, 0);
         } else if (strcmp(cmd, "scan_locos") == 0) {
             ESPNowManager::instance().sendDiscoveryScan();
-        } else if (strcmp(cmd, "pair_loco") == 0) {
-            String target = doc["target"] | "";
+        } else if (strcmp(cmd, "pair_loco") == 0 || strcmp(cmd, "pair_node") == 0) {
+            String target = doc["target"] | (doc["nodeId"] | "");
             if (target.length() > 0) {
                 ESPNowManager::instance().pairNode(target.c_str());
+            }
+        } else if (strcmp(cmd, "unpair_loco") == 0 || strcmp(cmd, "unpair_node") == 0 || strcmp(cmd, "remove_loco") == 0) {
+            String target = doc["target"] | (doc["nodeId"] | "");
+            if (target.length() > 0) {
+                ESPNowManager::instance().unpairNode(target.c_str());
+                ConfigStore::instance().removeLoco(target);
+                if (_onLocoControlCb) {
+                    _onLocoControlCb(target, 0, 2, 0, 0, 0, 0); // E-stop & clear from active loops
+                }
             }
         }
     }
@@ -97,7 +123,7 @@ void LocoWebServer::setupRoutes() {
             return;
         }
 
-        // Complete mobile-friendly embedded controller fallback
+        // Complete mobile-friendly embedded controller with 3-tab Advanced Configuration Studio
         const char* fallbackHtml = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt">
@@ -105,193 +131,440 @@ void LocoWebServer::setupRoutes() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#090d16">
-  <title>Lego Loco Controller V2.0</title>
+  <title>Lego Loco Controller</title>
   <style>
     :root {
-      --bg: #090d16; --card: #121826; --input: #0e1320;
-      --primary: #00d2ff; --success: #00f29b; --danger: #ff3366; --warning: #ffb703; --text: #f0f4fc;
+      --bg: #090d16; --card: #121826; --card-alt: #172033; --input: #0b0f19;
+      --primary: #00d2ff; --success: #00f29b; --danger: #ff3366; --warning: #ffb703;
+      --text: #f0f4fc; --text-dim: #8a99b5; --border: rgba(255,255,255,0.1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 12px; min-height: 100vh; padding-bottom: 40px; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px; border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08); }
-    .header h1 { font-size: 1.1rem; font-weight: 800; }
+    body { background: var(--bg); color: var(--text); padding: 12px; min-height: 100vh; padding-bottom: 50px; }
+    
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+    .header h1 { font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
     .header h1 span { color: var(--primary); }
-    .status-badge { font-size: 0.72rem; padding: 4px 8px; border-radius: 12px; background: rgba(0,242,155,0.15); color: var(--success); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .status-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 12px; background: rgba(0,242,155,0.15); color: var(--success); font-weight: 700; }
     .status-badge.offline { background: rgba(255,51,102,0.15); color: var(--danger); }
+    
+    /* Emergency Bar */
     .estop-bar { margin-bottom: 12px; }
-    .btn-estop { width: 100%; background: linear-gradient(135deg, #ff3366, #c9184a); border: none; color: #fff; padding: 14px; font-size: 1.1rem; font-weight: 800; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(255,51,102,0.4); }
-    .card { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-    .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .btn-estop { width: 100%; background: linear-gradient(135deg, #ff3366, #c9184a); border: none; color: #fff; padding: 13px; font-size: 1.1rem; font-weight: 800; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(255,51,102,0.4); }
+    
+    /* Nav Tabs */
+    .nav-tabs { display: flex; gap: 6px; background: var(--card); padding: 6px; border-radius: 12px; margin-bottom: 14px; border: 1px solid var(--border); overflow-x: auto; }
+    .nav-btn { flex: 1; min-width: 80px; background: transparent; border: none; color: var(--text-dim); padding: 9px 12px; font-size: 0.85rem; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s; white-space: nowrap; text-align: center; }
+    .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 2px 8px rgba(0,210,255,0.3); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .card-desc { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4; }
+    
+    /* Forms */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
+    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 9px 12px; border-radius: 8px; font-size: 0.9rem; }
+    .form-control:focus { outline: none; border-color: var(--primary); }
+    .field-hint { display: block; font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
+    
+    /* Grid */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    
+    /* Sliders & Buttons */
     .throttle-box { margin: 14px 0; }
-    .speed-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: #8a99b5; margin-bottom: 6px; }
+    .speed-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
     .speed-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
     .slider { width: 100%; height: 16px; border-radius: 8px; background: var(--input); -webkit-appearance: none; outline: none; }
     .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); cursor: pointer; }
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
-    .btn { background: #161e31; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px 6px; font-weight: 700; font-size: 0.85rem; border-radius: 8px; cursor: pointer; text-align: center; }
+    .btn { background: #161e31; border: 1px solid var(--border); color: #fff; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; border-radius: 8px; cursor: pointer; text-align: center; }
+    .btn.primary { background: linear-gradient(135deg, #00d2ff, #0077b6); color: #000; font-weight: 800; border: none; }
     .btn.stop { background: rgba(255,51,102,0.15); color: var(--danger); border-color: rgba(255,51,102,0.4); }
-    .btn.primary { background: linear-gradient(135deg, #00d2ff, #0077b6); color: #000; font-weight: 800; }
-    .form-group { margin-bottom: 10px; }
-    .form-group label { display: block; font-size: 0.8rem; color: #8a99b5; margin-bottom: 4px; font-weight: 600; }
-    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1px solid rgba(255,255,255,0.12); padding: 9px 12px; border-radius: 8px; font-size: 0.9rem; }
-    .notice { font-size: 0.75rem; color: #8a99b5; margin-top: 5px; line-height: 1.4; }
+    .btn.success { background: rgba(0,242,155,0.15); color: var(--success); border-color: rgba(0,242,155,0.4); }
+    .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
+    
+    /* Config Subtabs */
+    .subtabs-bar { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; padding-bottom: 8px; }
+    .subtab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+    .subtab-btn.active { background: rgba(0,210,255,0.15); border-color: rgba(0,210,255,0.4); color: var(--primary); }
+    .subtab-pane { display: none; }
+    .subtab-pane.active { display: block; }
+    
+    /* Tables */
+    .table-box { width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { background: rgba(255,255,255,0.04); color: var(--text-dim); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+    .input-sm { background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; font-size: 0.8rem; width: 100%; }
+    
+    .mode-toggle-group { display: flex; background: var(--input); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+    .mode-btn-top { background: transparent; border: none; color: var(--text-dim); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .mode-btn-top.active { background: var(--primary); color: #000; box-shadow: 0 1px 6px rgba(0,210,255,0.3); }
+    .notice { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }
     .notice-warn { background: rgba(255,183,3,0.12); color: var(--warning); border: 1px solid rgba(255,183,3,0.3); padding: 8px 10px; border-radius: 8px; font-size: 0.78rem; margin: 8px 0; }
   </style>
 </head>
 <body>
+  <!-- HEADER -->
   <div class="header">
-    <h1>LEGO LOCO <span>V2.0</span></h1>
-    <span class="status-badge" id="wsBadge">LIVE WS</span>
+    <h1>🚂 LEGO LOCO</h1>
+    <div class="header-right">
+      <div class="mode-toggle-group">
+        <button class="mode-btn-top active" id="btnModeMan" onclick="setSystemMode('MANUAL')">🕹️ MANUAL</button>
+        <button class="mode-btn-top" id="btnModeAuto" onclick="setSystemMode('AUTONOMOUS')">🤖 AUTONOMOUS</button>
+      </div>
+      <span class="status-badge" id="wsBadge">LIVE WS</span>
+    </div>
   </div>
 
+  <!-- MODE EXPLANATION BANNER -->
+  <div id="modeBanner" style="background:rgba(0,210,255,0.08);border:1px solid rgba(0,210,255,0.25);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
+    <div id="modeBannerText">
+      🕹️ <b>Manual Mode Active:</b> Direct throttle control via sliders. Master sends commands and failsafe stops motor on signal loss.
+    </div>
+  </div>
+
+  <!-- EMERGENCY STOP -->
   <div class="estop-bar">
     <button class="btn-estop" onclick="eStop()">🛑 EMERGENCY STOP</button>
   </div>
 
-  <!-- PAIRING & DISCOVERY FOR LOCOS & STATIONS -->
-  <div class="card" style="border-left: 4px solid var(--primary);">
-    <div class="card-title">
-      <span>🚂 / 🚉 Pair Devices</span>
-      <button class="btn primary" id="btnScan" style="padding:6px 12px;font-size:0.8rem;" onclick="scanForLocos()">🔍 Scan for Devices</button>
-    </div>
-    <p class="notice">
-      <b>Setup Procedure:</b> Turn on locomotive or station (LED pulses or OLED displays <i>UNPAIRED</i>) &bull; Click <b>Scan for Devices</b> &bull; Click <b>Pair to this Master</b>.<br>
-      🔒 <i>Once bonded, the node responds exclusively to this Master. To reset or move to another Master, re-flash firmware with Erase Flash.</i>
-    </p>
-    <div id="pairingStatus" class="notice" style="margin-top:6px;font-weight:600;"></div>
-    <div id="unpairedLocosList"></div>
+  <!-- NAVIGATION TABS -->
+  <div class="nav-tabs">
+    <button class="nav-btn active" onclick="switchNav('tabTraction')">🚂 Locos</button>
+    <button class="nav-btn" onclick="switchNav('tabTrack')">🔀 Switches</button>
+    <button class="nav-btn" onclick="switchNav('tabAuto')">🤖 Autonomous</button>
+    <button class="nav-btn" onclick="switchNav('tabConfig')">⚙️ Settings</button>
+    <button class="nav-btn" onclick="switchNav('tabFleet')">🛰️ Fleet</button>
   </div>
 
-  <!-- LOCOMOTIVE CONTROLLER -->
-  <div class="card">
-    <div class="card-title">
-      <span>Traction Control</span>
-      <span class="speed-val" id="spdText">0%</span>
+  <!-- TAB 1: TRACTION CONTROL -->
+  <div id="tabTraction" class="tab-content active">
+    <!-- Unpaired Discovery Banner -->
+    <div class="card" style="border-left: 4px solid var(--warning);">
+      <div class="card-title">
+        <span>🔍 Device Discovery</span>
+        <button class="btn primary btn-sm" id="btnScan" onclick="scanForDevices()">🔍 Scan</button>
+      </div>
+      <p class="notice">Pair new locomotives and stations to associate them with this Master.</p>
+      <div id="unpairedList" style="margin-top:8px;"></div>
     </div>
 
-    <div class="form-group">
-      <label>LOCOMOTIVE IN CONTROL:</label>
-      <select id="targetSelect" class="form-control" onchange="onTargetChanged()">
-        <option value="ALL">📢 ALL (Broadcast - All Locomotives)</option>
-      </select>
-      <div id="noLocoNotice" class="notice-warn">
-        ⚠️ No individual locomotive bonded to this Master. Click <b>Scan for Devices</b> above to pair your locomotive.
+    <!-- Throttle Card -->
+    <div class="card">
+      <div class="card-title">
+        <span>Traction Control</span>
+        <span class="status-badge" id="locoStateBadge" style="font-size:0.75rem;background:rgba(0,210,255,0.2);color:var(--primary);">🕹️ MANUAL MODE</span>
+        <span class="speed-val" id="spdText">0%</span>
+      </div>
+
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <label style="margin-bottom:0;">ACTIVE LOCOMOTIVE:</label>
+          <button id="btnUnpairActiveLoco" class="btn danger btn-sm" style="display:none;padding:2px 8px;font-size:0.75rem;" onclick="unpairActiveLoco()">🗑️ Unpair</button>
+        </div>
+        <select id="targetSelect" class="form-control" onchange="onTargetChanged()" style="margin-top:6px;">
+          <option value="ALL">📢 All Locomotives (Broadcast)</option>
+        </select>
+      </div>
+
+      <div class="throttle-box">
+        <div class="speed-label">
+          <span>◀ Reverse (-100%)</span>
+          <span>Forward (+100%) ▶</span>
+        </div>
+        <input type="range" class="slider" id="spdSlider" min="-100" max="100" value="0" oninput="setSpeed(this.value)">
+      </div>
+
+      <div class="btn-grid">
+        <button class="btn" onclick="quickSpeed(-50)">◀ REV 50%</button>
+        <button class="btn stop" onclick="quickSpeed(0)">⏹ STOP</button>
+        <button class="btn" onclick="quickSpeed(50)">FWD 50% ▶</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" style="flex:1;" onclick="toggleLight(1)">💡 Auto Lights</button>
+        <button class="btn" style="flex:1;" onclick="toggleLight(0)">Lights Off</button>
       </div>
     </div>
-
-    <div class="throttle-box">
-      <div class="speed-label">
-        <span>◀ Reverse (-100%)</span>
-        <span>Forward (+100%) ▶</span>
-      </div>
-      <input type="range" class="slider" id="spdSlider" min="-100" max="100" value="0" oninput="setSpeed(this.value)">
-    </div>
-
-    <!-- Buttons in natural order: Left (REV), Center (STOP), Right (FWD) -->
-    <div class="btn-grid">
-      <button class="btn" onclick="quickSpeed(-50)">◀ REV 50%</button>
-      <button class="btn stop" onclick="quickSpeed(0)">⏹ STOP</button>
-      <button class="btn" onclick="quickSpeed(50)">FWD 50% ▶</button>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-top:10px;">
-      <button class="btn" style="flex:1;" onclick="toggleLight(1)">💡 Auto Lights</button>
-      <button class="btn" style="flex:1;" onclick="toggleLight(0)">Lights Off</button>
-    </div>
   </div>
 
-  <!-- TRACK SWITCHES -->
-  <div class="card">
-    <div class="card-title"><span>Track Switches</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <button class="btn" onclick="setSwitch(0)">STRAIGHT</button>
-      <button class="btn" onclick="setSwitch(1)">TURNOUT</button>
-    </div>
-  </div>
-
-  <!-- SCENARIO CSV MANAGER (IMPORT / EXPORT) -->
-  <div class="card">
-    <div class="card-title">
-      <span>Automated Scenarios (CSV)</span>
-      <span id="scRunningText" style="font-size:0.75rem;color:var(--primary);font-weight:700;">Manual</span>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <select id="scSelect" class="form-control" style="flex:1;"></select>
-      <button id="btnRunSc" class="btn primary" style="padding:0 16px;" onclick="toggleScenarioRun()">▶ Start</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <button class="btn" onclick="exportScenarioCsv()">⬇️ Export .CSV</button>
-      <button class="btn" onclick="document.getElementById('csvFileInput').click()">⬆️ Import .CSV</button>
-      <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="importScenarioCsv(this)">
-    </div>
-    <div id="scMsg" class="notice"></div>
-  </div>
-
-  <!-- AP & NETWORK SETTINGS (MULTI-INSTALLATION ISOLATION) -->
-  <div class="card">
-    <div class="card-title">
-      <span>⚙️ Access Point (AP) Settings</span>
-      <button class="btn" style="padding:4px 10px;font-size:0.75rem;" onclick="toggleSettingsView()">Toggle Settings</button>
-    </div>
-    <div id="settingsPanel" style="display:none;margin-top:10px;">
-      <p class="notice" style="margin-bottom:12px;">
-        Configure Wi-Fi SSID and radio channel to isolate layouts and prevent interference when operating near other model train layouts.
+  <!-- TAB 2: TRACK SWITCHES -->
+  <div id="tabTrack" class="tab-content">
+    <div class="card">
+      <div class="card-title"><span>🔀 Station Track Switches &amp; Turnouts</span></div>
+      <p class="notice" style="margin-bottom:10px;">
+        Individual control of track switches and servo turnout motors, identified by their <b>ID</b> and <b>GPIO pin</b> on each station.
       </p>
-
-      <div class="form-group">
-        <label>Wi-Fi SSID (Access Point Name):</label>
-        <input type="text" id="cfgSsid" class="form-control" placeholder="LegoTrain_Master">
+      <div id="manualSwitchesContainer"></div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px;">
+        <span style="font-size:0.8rem;color:#8a99b5;">Broadcast All Turnouts Control:</span>
+        <div class="grid-2" style="margin-top:6px;">
+          <button class="btn primary" onclick="setSwitch('ALL', 0, 0)">➡️ ALL STRAIGHT</button>
+          <button class="btn primary" onclick="setSwitch('ALL', 0, 1)">🔀 ALL TURNOUT</button>
+        </div>
       </div>
-
-      <div class="form-group">
-        <label>Wi-Fi Password (Leave empty for open network):</label>
-        <input type="text" id="cfgPass" class="form-control" placeholder="Min 8 characters or empty">
-      </div>
-
-      <div class="form-group">
-        <label>Wi-Fi / ESP-NOW Channel (1 to 13):</label>
-        <input type="number" id="cfgChannel" min="1" max="13" class="form-control" value="1">
-        <span class="notice">Tip: Layout 1 on Channel 1, Layout 2 on Channel 6 or 11.</span>
-      </div>
-
-      <button class="btn primary" style="width:100%;margin-top:10px;padding:12px;" onclick="saveSettings()">
-        💾 Save Settings & Restart AP
-      </button>
-      <div id="cfgMsg" class="notice" style="margin-top:8px;"></div>
+      <div id="trackStateNotice" class="notice" style="margin-top:12px;"></div>
     </div>
   </div>
 
-  <div class="notice" style="text-align:center;">
-    Lego Loco Gateway V2.0 &bull; IP: 192.168.4.1 &bull; http://legoloco.local
+  <!-- TAB 3: AUTONOMOUS & LEARNING -->
+  <div id="tabAuto" class="tab-content">
+    <div class="card" style="border-left: 4px solid var(--success);">
+      <div class="card-title">
+        <span>🤖 Autonomous Operations &amp; Learning</span>
+      </div>
+      <p class="notice">
+        <b>Learning Lap:</b> Locomotive drives around track at 35% calibration speed, learns inter-beacon transit times, and auto-calibrates station stop deceleration.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+        <button class="btn success" onclick="startLearningLap()">🚀 Start Learning Lap</button>
+        <button class="btn" onclick="resetLearningLap()">🔄 Reset Calibration</button>
+      </div>
+      <div id="learningStatus" class="notice" style="margin-top:10px;font-weight:700;"></div>
+    </div>
   </div>
 
-  <script>
-    let ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws');
-    let timer = null;
-    let isRunningScenario = false;
+  <!-- TAB 4: ADVANCED CONFIGURATION STUDIO (3 SEPARATORS) -->
+  <div id="tabConfig" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>⚙️ Advanced Configuration Studio</span>
+      </div>
 
-    ws.onopen = () => { document.getElementById('wsBadge').textContent = 'ONLINE'; document.getElementById('wsBadge').classList.remove('offline'); };
-    ws.onclose = () => { document.getElementById('wsBadge').textContent = 'OFFLINE'; document.getElementById('wsBadge').classList.add('offline'); setTimeout(() => location.reload(), 3000); };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.event === 'node_update') { refreshNodes(); }
-      } catch(err){}
-    };
+      <!-- 3 Separators (Subtabs) -->
+      <div class="subtabs-bar">
+        <button class="subtab-btn active" id="btnSubGlobal" onclick="switchConfigSub('subGlobal')">🌐 1. Global</button>
+        <button class="subtab-btn" id="btnSubLocos" onclick="switchConfigSub('subLocos')">🚂 2. Locomotives</button>
+        <button class="subtab-btn" id="btnSubStations" onclick="switchConfigSub('subStations')">🚉 3. Stations &amp; Beacons</button>
+      </div>
+
+      <!-- SUBTAB 1: GLOBAL -->
+      <div id="subGlobal" class="subtab-pane active">
+        <div class="card-desc">Global parameters for Wi-Fi network, radio channel isolation, and anti-collision safety headways.</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Track / Layout Name:</label>
+            <input type="text" id="cfgLayout" class="form-control" placeholder="Lego Central">
+          </div>
+          <div class="form-group">
+            <label>Wi-Fi SSID (Access Point Name):</label>
+            <input type="text" id="cfgSsid" class="form-control" placeholder="LegoTrain_Master">
+          </div>
+          <div class="form-group">
+            <label>Wi-Fi Password (or empty for open network):</label>
+            <input type="text" id="cfgPass" class="form-control" placeholder="Min 8 characters or empty">
+          </div>
+          <div class="form-group">
+            <label>Wi-Fi / ESP-NOW Radio Channel (1 to 13):</label>
+            <input type="number" id="cfgChannel" min="1" max="13" class="form-control" value="1">
+            <span class="field-hint">Allows isolating multiple layouts (e.g. Layout 1 on Channel 1, Layout 2 on Channel 6).</span>
+          </div>
+          <div class="form-group">
+            <label>Anti-Collision Safe Headway (seconds):</label>
+            <input type="number" id="cfgSafeSec" min="4" max="60" class="form-control" value="12">
+            <span class="field-hint">Green Aspect: safe headway between locomotives.</span>
+          </div>
+          <div class="form-group">
+            <label>Proximity Warning Headway (seconds):</label>
+            <input type="number" id="cfgCautionSec" min="2" max="30" class="form-control" value="6">
+            <span class="field-hint">Yellow Aspect: triggers preventive deceleration.</span>
+          </div>
+          <div class="form-group">
+            <label>Warning Speed Trim (% reduction):</label>
+            <input type="number" id="cfgTrimPct" min="10" max="80" class="form-control" value="40">
+            <span class="field-hint">Speed reduction when approaching preceding locomotive.</span>
+          </div>
+        </div>
+        <button class="btn primary" style="margin-top:10px;width:100%;" onclick="saveGlobalConfig()">💾 Save Global Settings</button>
+      </div>
+
+      <!-- SUBTAB 2: LOCOMOTIVES -->
+      <div id="subLocos" class="subtab-pane">
+        <div class="card-desc">Dynamic kinetic parameters, acceleration, deceleration, station dwell times, and length for each locomotive.</div>
+        <div id="locoCardsList"></div>
+      </div>
+
+      <!-- SUBTAB 3: STATIONS & BEACONS -->
+      <div id="subStations" class="subtab-pane">
+        <div class="card-desc">
+          Station configuration, turnout switch control, and beacon management. Supports multiple beacons per station configured as <b>Locators</b> or <b>Station Arrival</b>, with automatic train length measurement.
+        </div>
+        <div id="stationCardsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: FLEET & DISCOVERY -->
+  <div id="tabFleet" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>🛰️ ESP-NOW Network &amp; Fleet Devices</span>
+        <button class="btn primary btn-sm" onclick="scanForDevices()">🔍 Scan</button>
+      </div>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr><th>Node</th><th>Name</th><th>Type</th><th>Signal</th><th>Status</th><th>Action</th></tr>
+          </thead>
+          <tbody id="nodesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIC SCRIPT -->
+  <script>
+    let ws = null;
+    let timer = null;
+    let currentMode = 'MANUAL';
+    let systemConfig = { system: {}, locomotives: [], stations: [] };
+    let discoveredNodes = [];
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      initWs();
+      loadNodes();
+      loadConfig();
+      updateModeUI();
+      setInterval(loadNodes, 3000);
+    });
+
+    function setSystemMode(mode) {
+      currentMode = mode;
+      updateModeUI();
+      sendCmd({ cmd: 'set_mode', mode: mode });
+    }
+
+    function updateModeUI() {
+      const isAuto = (currentMode === 'AUTONOMOUS' || currentMode === 'AUTOMATIC');
+      const btnMan = document.getElementById('btnModeMan');
+      const btnAut = document.getElementById('btnModeAuto');
+      if (btnMan) btnMan.classList.toggle('active', !isAuto);
+      if (btnAut) btnAut.classList.toggle('active', isAuto);
+
+      const bText = document.getElementById('modeBannerText');
+      const bDiv = document.getElementById('modeBanner');
+      const lBadge = document.getElementById('locoStateBadge');
+
+      if (isAuto) {
+        if (bDiv) { bDiv.style.background = 'rgba(0,242,155,0.08)'; bDiv.style.borderColor = 'rgba(0,242,155,0.3)'; }
+        if (bText) bText.innerHTML = '🤖 <b>Autonomous Mode Active:</b> Locomotive manages speed and station stops independently. Stations coordinate turnouts and anti-collision via direct ESP-NOW.';
+        if (lBadge) {
+          lBadge.textContent = '🤖 AUTONOMOUS';
+          lBadge.style.background = 'rgba(0,242,155,0.2)';
+          lBadge.style.color = 'var(--success)';
+        }
+      } else {
+        if (bDiv) { bDiv.style.background = 'rgba(0,210,255,0.08)'; bDiv.style.borderColor = 'rgba(0,210,255,0.25)'; }
+        if (bText) bText.innerHTML = '🕹️ <b>Manual Mode Active:</b> Direct throttle control via sliders. Master sends commands and failsafe stops motor on signal loss.';
+        if (lBadge) {
+          lBadge.textContent = '🕹️ MANUAL';
+          lBadge.style.background = 'rgba(0,210,255,0.2)';
+          lBadge.style.color = 'var(--primary)';
+        }
+      }
+    }
+
+    // Navigation
+    function switchNav(tabId) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
+      if (tabId === 'tabConfig') loadConfig();
+    }
+
+    function switchConfigSub(subId) {
+      document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.subtab-pane').forEach(p => p.classList.remove('active'));
+      const btn = document.getElementById('btn' + subId.charAt(0).toUpperCase() + subId.slice(1));
+      if (btn) btn.classList.add('active');
+      const pane = document.getElementById(subId);
+      if (pane) pane.classList.add('active');
+    }
+
+    // WebSocket
+    function initWs() {
+      const url = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws';
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        document.getElementById('wsBadge').textContent = 'ONLINE';
+        document.getElementById('wsBadge').classList.remove('offline');
+      };
+      ws.onclose = () => {
+        document.getElementById('wsBadge').textContent = 'OFFLINE';
+        document.getElementById('wsBadge').classList.add('offline');
+        setTimeout(initWs, 3000);
+      };
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.event === 'node_update') loadNodes();
+          if (msg.event === 'loco_telemetry') {
+            const d = msg.data;
+            const lBadge = document.getElementById('locoStateBadge');
+            if (lBadge) {
+              if (d.locoState === 1) {
+                lBadge.textContent = '🚀 LEARNING';
+                lBadge.style.background = 'rgba(255,183,3,0.2)';
+                lBadge.style.color = 'var(--warning)';
+              } else if (d.locoState === 2) {
+                lBadge.textContent = '🤖 AUTONOMOUS';
+                lBadge.style.background = 'rgba(0,242,155,0.2)';
+                lBadge.style.color = 'var(--success)';
+              } else {
+                lBadge.textContent = '🕹️ MANUAL';
+                lBadge.style.background = 'rgba(0,210,255,0.2)';
+                lBadge.style.color = 'var(--primary)';
+              }
+            }
+          }
+        } catch(err) {}
+      };
+    }
 
     function sendCmd(obj) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(obj));
+      } else {
+        fetch('/api/control/' + (obj.cmd && obj.cmd.includes('loco') ? 'loco' : 'track'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(obj)
+        }).catch(() => {});
+      }
     }
+
+    // Traction
     function getSelectedTarget() {
       const el = document.getElementById('targetSelect');
       return el ? el.value : 'ALL';
     }
     function onTargetChanged() {
-      const t = getSelectedTarget();
       document.getElementById('spdSlider').value = 0;
       document.getElementById('spdText').textContent = '0%';
+      const tgt = getSelectedTarget();
+      const btn = document.getElementById('btnUnpairActiveLoco');
+      if (btn) btn.style.display = (tgt !== 'ALL') ? 'inline-block' : 'none';
+    }
+    function unpairActiveLoco() {
+      const tgt = getSelectedTarget();
+      if (tgt !== 'ALL') unpairLoco(tgt);
     }
     function setSpeed(v) {
+      if (currentMode === 'AUTONOMOUS') {
+        currentMode = 'MANUAL';
+        updateModeUI();
+      }
       document.getElementById('spdText').textContent = v + '%';
       clearTimeout(timer);
       timer = setTimeout(() => {
@@ -309,208 +582,623 @@ void LocoWebServer::setupRoutes() {
     function toggleLight(m) {
       sendCmd({ cmd: 'loco_throttle', target: getSelectedTarget(), lightMode: m });
     }
-    function setSwitch(p) {
-      sendCmd({ cmd: 'track_switch', target: 'ALL', position: p });
-    }
-
-    async function scanForLocos() {
-      const btn = document.getElementById('btnScan');
-      const st = document.getElementById('pairingStatus');
-      btn.disabled = true;
-      btn.textContent = '⏳ Scanning...';
-      st.textContent = '📡 Broadcasting ESP-NOW discovery scan... Power on devices.';
-      try {
-        await fetch('/api/locos/scan', { method: 'POST' });
-        sendCmd({ cmd: 'scan_locos' });
-        setTimeout(refreshNodes, 400);
-        setTimeout(refreshNodes, 1200);
-        setTimeout(refreshNodes, 2500);
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = '🔍 Scan for Devices';
-          st.textContent = 'Scan complete.';
-        }, 3000);
-      } catch(e) {
-        btn.disabled = false;
-        btn.textContent = '🔍 Scan for Devices';
-        st.textContent = '❌ Error sending discovery scan.';
+    function setSwitch(target, swIdx, p) {
+      if (typeof target === 'number') {
+        p = target;
+        target = 'ALL';
+        swIdx = 0;
       }
+      sendCmd({ cmd: 'track_switch', target: target || 'ALL', switchIndex: (swIdx !== undefined ? swIdx : 0), position: p });
+      const notice = document.getElementById('trackStateNotice');
+      if (notice) notice.textContent = `Command sent to switch #${(swIdx || 0) + 1} (${target}): ${p === 0 ? 'STRAIGHT' : 'TURNOUT'}`;
     }
 
-    async function pairLoco(nodeId) {
-      const st = document.getElementById('pairingStatus');
-      st.textContent = '🔗 Pairing & bonding ' + nodeId + ' to this Master...';
+    function renderManualTrackSwitches() {
+      const container = document.getElementById('manualSwitchesContainer');
+      if (!container) return;
+      const stations = systemConfig.stations || [];
+      if (stations.length === 0) {
+        container.innerHTML = '<span class="notice">No stations detected. Turn on a station node or configure in the Settings tab.</span>';
+        return;
+      }
+      container.innerHTML = stations.map(st => {
+        const sws = (st.switches && st.switches.length > 0) ? st.switches : [{ switchId: 1, gpioPin: 18, defaultPosition: 'STRAIGHT', description: 'Main Turnout' }];
+        return `
+          <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b>🚉 ${st.name || st.nodeId}</b> <code style="font-size:0.75rem;color:var(--primary);">${st.nodeId}</code>
+            </div>
+            ${sws.map((sw, swIdx) => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px 10px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <b style="color:var(--text);">Switch #${sw.switchId}</b>
+                  <span class="status-badge" style="margin-left:6px;font-size:0.7rem;">GPIO ${sw.gpioPin}</span>
+                  <span style="font-size:0.8rem;color:#8a99b5;margin-left:8px;">${sw.description || ''}</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-sm" onclick="setSwitch('${st.nodeId}', ${swIdx}, 0)">➡️ Straight</button>
+                  <button class="btn primary btn-sm" onclick="setSwitch('${st.nodeId}', ${swIdx}, 1)">🔀 Turnout</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Scan & Pair
+    async function scanForDevices() {
+      const btn = document.getElementById('btnScan');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning...'; }
+      sendCmd({ cmd: 'scan_locos' });
+      try { await fetch('/api/locos/scan', { method: 'POST' }); } catch(e){}
+      setTimeout(loadNodes, 500);
+      setTimeout(loadNodes, 1500);
+      setTimeout(() => {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan'; }
+      }, 3000);
+    }
+
+    async function pairNode(id) {
       try {
         const res = await fetch('/api/locos/pair', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId: nodeId })
+          body: JSON.stringify({ nodeId: id })
         });
         if (res.ok) {
-          st.textContent = '✅ Success! ' + nodeId + ' is now bonded to this Master (persisted in EEPROM).';
-          refreshNodes();
-        } else {
-          st.textContent = '❌ Failed to pair ' + nodeId + '.';
+          alert('Node ' + id + ' paired successfully!');
+          loadNodes();
         }
       } catch(e) {
-        st.textContent = '❌ Communication error: ' + e.message;
+        alert('Failed to pair node: ' + e.message);
       }
     }
 
-    async function refreshNodes() {
+    async function unpairLoco(id) {
+      if (!confirm('Are you sure you want to remove and unpair locomotive ' + id + '?\n\nThe locomotive will become unbonded and ready for re-pairing immediately without reflashing.')) return;
+      try {
+        const res = await fetch('/api/locos/unpair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: id })
+        });
+        if (res.ok) {
+          alert('Locomotive ' + id + ' unpaired successfully!');
+          loadNodes();
+          loadConfig();
+        } else {
+          alert('Failed to unpair locomotive.');
+        }
+      } catch(e) {
+        alert('Error unpairing: ' + e.message);
+      }
+    }
+
+    // Autonomous
+    async function startLearningLap(targetLoco) {
+      const tgt = targetLoco || getSelectedTarget();
+      const st = document.getElementById('learningStatus');
+      if (st) st.textContent = '🚀 Starting learning lap for ' + tgt + '...';
+      try {
+        await fetch('/api/learning/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetLocoId: tgt, calibrationSpeed: 35 })
+        });
+        if (st) st.textContent = '🏁 Learning lap in progress (calibration at 35%)...';
+      } catch(e) {
+        if (st) st.textContent = '❌ Error: ' + e.message;
+      }
+    }
+
+    async function resetLearningLap(targetLoco) {
+      const tgt = targetLoco || getSelectedTarget();
+      const st = document.getElementById('learningStatus');
+      try {
+        await fetch('/api/learning/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetLocoId: tgt })
+        });
+        if (st) st.textContent = '🔄 Calibration reset for ' + tgt + '.';
+      } catch(e) {}
+    }
+
+    // Nodes List
+    async function loadNodes() {
       try {
         const res = await fetch('/api/nodes');
         const nodes = await res.json();
+        discoveredNodes = nodes;
+        
+        // Select options
         const sel = document.getElementById('targetSelect');
         const curr = sel.value;
-        sel.innerHTML = '<option value="ALL">📢 ALL (Broadcast - All Locomotives)</option>';
-        let pairedCount = 0;
-        let unpairedList = [];
-
-        nodes.forEach(n => {
-          if (n.isPaired) {
-            if (n.nodeType === 'LOCO' || n.nodeId.startsWith('LOCO')) {
-              pairedCount++;
-              const opt = document.createElement('option');
-              opt.value = n.nodeId;
-              opt.textContent = '🚂 ' + (n.friendlyName || n.nodeId) + ' [🔒 Bonded]' + (n.isOnline ? ' [Online]' : ' [Offline]');
-              sel.appendChild(opt);
-            }
-          } else if (!n.isBondedOther) {
-            unpairedList.push(n);
-          }
-        });
-
-        const unpDiv = document.getElementById('unpairedLocosList');
-        if (unpairedList.length > 0) {
-          let html = '<div style="margin-top:8px;font-size:0.8rem;font-weight:700;color:var(--warning);">Devices Ready to Pair:</div>';
-          unpairedList.forEach(u => {
-            const isLoco = (u.nodeType === 'LOCO' || u.nodeId.startsWith('LOCO'));
-            const icon = isLoco ? '🚂' : '🚉';
-            const typeStr = isLoco ? 'Unpaired Locomotive' : 'Unpaired Station';
-            html += '<div style="background:rgba(255,183,3,0.1);border:1px solid rgba(255,183,3,0.3);padding:8px 10px;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">';
-            html += '<div><b>' + icon + ' ' + u.nodeId + '</b> <span style="font-size:0.75rem;color:#8a99b5;">(' + typeStr + ')</span></div>';
-            html += '<button class="btn primary" style="padding:5px 10px;font-size:0.75rem;" onclick="pairLoco(\'' + u.nodeId + '\')">🔗 Pair to this Master</button>';
-            html += '</div>';
-          });
-          unpDiv.innerHTML = html;
-        } else {
-          unpDiv.innerHTML = '';
-        }
-
-        if (pairedCount > 0) {
-          document.getElementById('noLocoNotice').style.display = 'none';
-        } else {
-          document.getElementById('noLocoNotice').style.display = 'block';
-        }
-        sel.value = curr;
-      } catch(e){}
-    }
-
-    async function loadScenarios() {
-      try {
-        const res = await fetch('/api/scenarios');
-        const list = await res.json();
-        const sel = document.getElementById('scSelect');
-        sel.innerHTML = '';
-        list.forEach(f => {
+        sel.innerHTML = '<option value="ALL">📢 All Locomotives (Broadcast)</option>';
+        nodes.filter(n => n.nodeType === 'LOCO' && n.isPaired).forEach(l => {
           const opt = document.createElement('option');
-          opt.value = f;
-          opt.textContent = f;
+          opt.value = l.nodeId;
+          opt.textContent = '🚂 ' + (l.friendlyName || l.nodeId) + ' [🔒 Bonded]' + (l.isOnline ? ' [Online]' : ' [Offline]');
           sel.appendChild(opt);
         });
-      } catch(e){}
-    }
+        sel.value = curr;
 
-    function toggleScenarioRun() {
-      const sc = document.getElementById('scSelect').value || 'default.csv';
-      isRunningScenario = !isRunningScenario;
-      sendCmd({ cmd: 'run_scenario', scenario: sc, run: isRunningScenario });
-      document.getElementById('btnRunSc').textContent = isRunningScenario ? '⏹ Stop' : '▶ Start';
-      document.getElementById('scRunningText').textContent = isRunningScenario ? 'AUTOMATIC (' + sc + ')' : 'Manual';
-    }
-
-    async function exportScenarioCsv() {
-      const sc = document.getElementById('scSelect').value || 'default.csv';
-      try {
-        const res = await fetch('/api/scenario?name=' + encodeURIComponent(sc));
-        if (!res.ok) throw new Error('Scenario not found');
-        const text = await res.text();
-        const blob = new Blob([text], { type: 'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = sc;
-        a.click();
-        document.getElementById('scMsg').textContent = '✅ File ' + sc + ' exported successfully.';
-      } catch(err) {
-        document.getElementById('scMsg').textContent = '❌ Export error: ' + err.message;
-      }
-    }
-
-    async function importScenarioCsv(input) {
-      if (!input.files || input.files.length === 0) return;
-      const file = input.files[0];
-      try {
-        const text = await file.text();
-        const res = await fetch('/api/scenario?name=' + encodeURIComponent(file.name), {
-          method: 'POST',
-          body: text
-        });
-        if (res.ok) {
-          document.getElementById('scMsg').textContent = '✅ Scenario ' + file.name + ' imported successfully!';
-          loadScenarios();
+        // Unpaired banner
+        const unpList = document.getElementById('unpairedList');
+        const unpaired = nodes.filter(n => !n.isPaired && !n.isBondedOther);
+        if (unpaired.length > 0) {
+          unpList.innerHTML = unpaired.map(u => `
+            <div style="background:rgba(255,183,3,0.1);border:1px solid rgba(255,183,3,0.3);padding:8px 12px;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+              <div><b>${u.nodeType === 'LOCO' ? '🚂' : '🚉'} ${u.nodeId}</b> <span style="font-size:0.75rem;color:#8a99b5;">(${u.friendlyName || 'Ready Device'})</span></div>
+              <button class="btn primary btn-sm" onclick="pairNode('${u.nodeId}')">🔗 Pair</button>
+            </div>
+          `).join('');
         } else {
-          document.getElementById('scMsg').textContent = '❌ Failed to save imported scenario.';
+          unpList.innerHTML = '<span class="notice">All detected nodes are currently paired.</span>';
         }
-      } catch(err) {
-        document.getElementById('scMsg').textContent = '❌ Error reading file: ' + err.message;
+
+        // Fleet table
+        const tbody = document.getElementById('nodesTableBody');
+        if (tbody) {
+          tbody.innerHTML = nodes.map(n => `
+            <tr>
+              <td><code>${n.nodeId}</code></td>
+              <td><b>${n.friendlyName || '--'}</b></td>
+              <td><span class="status-badge">${n.nodeType}</span></td>
+              <td>${n.rssi || -50} dBm</td>
+              <td><span class="status-badge ${n.isOnline ? '' : 'offline'}">${n.isOnline ? 'ONLINE' : 'OFFLINE'}</span></td>
+              <td>${n.isPaired ? `<span>🔒 Paired</span> <button class="btn danger btn-sm" style="margin-left:6px;padding:2px 8px;font-size:0.75rem;" onclick="unpairLoco('${n.nodeId}')">🗑️ Unpair</button>` : `<button class="btn primary btn-sm" onclick="pairNode('${n.nodeId}')">Pair</button>`}</td>
+            </tr>
+          `).join('');
+        }
+      } catch(e) {}
+    }
+
+    // Config Management (Unified API)
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          systemConfig = await res.json();
+        }
+      } catch(e) {}
+
+      // 1. Render Global
+      const sys = systemConfig.system || {};
+      document.getElementById('cfgLayout').value = sys.layoutName || 'Lego Central Layout';
+      document.getElementById('cfgSsid').value = sys.wifiSsid || 'LegoTrain_Master';
+      document.getElementById('cfgPass').value = sys.wifiPassword || '';
+      document.getElementById('cfgChannel').value = sys.wifiChannel || 1;
+      document.getElementById('cfgSafeSec').value = sys.headwaySafeSec || 12;
+      document.getElementById('cfgCautionSec').value = sys.headwayCautionSec || 6;
+      document.getElementById('cfgTrimPct').value = sys.headwaySpeedTrimPct || 40;
+
+      // 2. Render Locomotives
+      renderLocosConfig();
+
+      // 3. Render Stations & Beacons
+      renderStationsConfig();
+    }
+
+    function renderLocosConfig() {
+      const container = document.getElementById('locoCardsList');
+      if (!container) return;
+
+      const locos = [...(systemConfig.locomotives || [])];
+      discoveredNodes.filter(n => n.nodeType === 'LOCO').forEach(d => {
+        if (!locos.some(l => l.nodeId === d.nodeId)) {
+          locos.push({
+            nodeId: d.nodeId,
+            name: d.friendlyName || d.nodeId,
+            maxSpeed: 70,
+            learningSpeed: 35,
+            accelRate: 40.0,
+            decelRate: 60.0,
+            brakeOffsetMs: 450,
+            dwellTimeSec: 12,
+            measuredLengthCm: 28
+          });
+        }
+      });
+
+      if (locos.length === 0) {
+        container.innerHTML = '<p class="notice" style="padding:10px;">No locomotives configured or detected. Power on locomotive and click Scan.</p>';
+        return;
       }
-      input.value = '';
+
+      container.innerHTML = locos.map((l, idx) => `
+        <div class="card" style="margin-top:10px;background:var(--card-alt);">
+          <div class="card-title">
+            <span>🚂 ${l.name || l.nodeId} <code style="font-size:0.75rem;color:var(--primary);">${l.nodeId}</code></span>
+            <div>
+              <button class="btn success btn-sm" onclick="startLearningLap('${l.nodeId}')">🚀 Learning Lap</button>
+              <button class="btn danger btn-sm" style="margin-left:6px;" onclick="unpairLoco('${l.nodeId}')">🗑️ Remove / Unpair</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Locomotive Name:</label>
+              <input type="text" class="form-control" id="locoName_${idx}" value="${l.name || ''}">
+            </div>
+            <div class="form-group">
+              <label>Maximum Speed (%):</label>
+              <input type="number" class="form-control" id="locoMax_${idx}" min="20" max="100" value="${l.maxSpeed || 70}">
+            </div>
+            <div class="form-group">
+              <label>Learning Speed (%):</label>
+              <input type="number" class="form-control" id="locoLearn_${idx}" min="20" max="60" value="${l.learningSpeed || 35}">
+              <span class="field-hint">Standardized speed for track discovery and length measurement.</span>
+            </div>
+            <div class="form-group">
+              <label>Acceleration Rate (%/s):</label>
+              <input type="number" class="form-control" id="locoAcc_${idx}" min="10" max="100" value="${l.accelRate || 40}">
+            </div>
+            <div class="form-group">
+              <label>Deceleration Rate (%/s):</label>
+              <input type="number" class="form-control" id="locoDec_${idx}" min="10" max="150" value="${l.decelRate || 60}">
+            </div>
+            <div class="form-group">
+              <label>Smooth Braking Offset (ms):</label>
+              <input type="number" class="form-control" id="locoBrake_${idx}" min="0" max="2000" value="${l.brakeOffsetMs || 450}">
+            </div>
+            <div class="form-group">
+              <label>Station Dwell Time (s):</label>
+              <input type="number" class="form-control" id="locoDwell_${idx}" min="2" max="60" value="${l.dwellTimeSec || 12}">
+            </div>
+            <div class="form-group">
+              <label>Measured Train Length (cm):</label>
+              <input type="number" class="form-control" id="locoLen_${idx}" min="10" max="250" value="${l.measuredLengthCm || 28}">
+              <span class="field-hint">Automatically measured by optical sensors or adjusted manually.</span>
+            </div>
+          </div>
+          <button class="btn primary btn-sm" style="margin-top:8px;width:100%;" onclick="saveLocoConfig(${idx}, '${l.nodeId}')">💾 Save Locomotive Settings</button>
+        </div>
+      `).join('');
     }
 
-    function toggleSettingsView() {
-      const p = document.getElementById('settingsPanel');
-      p.style.display = (p.style.display === 'none' ? 'block' : 'none');
-      if (p.style.display === 'block') loadSettings();
+    function renderStationsConfig() {
+      const container = document.getElementById('stationCardsList');
+      if (!container) return;
+
+      const stations = [...(systemConfig.stations || [])];
+      discoveredNodes.filter(n => n.nodeType === 'TRACK').forEach(d => {
+        if (!stations.some(s => s.nodeId === d.nodeId)) {
+          stations.push({
+            nodeId: d.nodeId,
+            name: d.friendlyName || d.nodeId,
+            dwellTimeSec: 10,
+            autoDivertOnOccupied: true,
+            sidingCapacityCm: 65,
+            switches: [
+              { switchId: 1, gpioPin: 18, servoStraightAngle: 75, servoTurnoutAngle: 105, defaultPosition: 'STRAIGHT', description: 'Main Turnout' }
+            ],
+            beacons: [
+              { beaconId: 10, gpioPin: 19, role: 'ROLE_LOCATOR', description: 'Entry / Locator', measureTrainLength: true },
+              { beaconId: 11, gpioPin: 19, role: 'ROLE_STATION_ARRIVAL', description: 'Platform (Stop)', measureTrainLength: true }
+            ]
+          });
+        }
+      });
+
+      if (stations.length === 0) {
+        container.innerHTML = '<p class="notice" style="padding:10px;">No stations configured or detected. Power on track/station module and click Scan.</p>';
+        return;
+      }
+
+      container.innerHTML = stations.map((s, sIdx) => {
+        const swList = (s.switches && s.switches.length > 0) ? s.switches : [
+          { switchId: 1, gpioPin: s.switchGpioPin || 18, servoStraightAngle: s.servoStraightAngle || 75, servoTurnoutAngle: s.servoTurnoutAngle || 105, defaultPosition: s.defaultSwitch || 'STRAIGHT', description: 'Main Turnout' }
+        ];
+        const bList = s.beacons || [];
+        return `
+          <div class="card" style="margin-top:10px;background:var(--card-alt);">
+            <div class="card-title">
+              <span>🚉 ${s.name || s.nodeId} <code style="font-size:0.75rem;color:var(--primary);">${s.nodeId}</code></span>
+            </div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Station Name:</label>
+                <input type="text" class="form-control" id="stName_${sIdx}" value="${s.name || ''}">
+              </div>
+              <div class="form-group">
+                <label>Station Dwell Time (s):</label>
+                <input type="number" class="form-control" id="stDwell_${sIdx}" min="0" max="120" value="${s.dwellTimeSec || 10}">
+              </div>
+              <div class="form-group">
+                <label>Siding Capacity (cm):</label>
+                <input type="number" class="form-control" id="stSiding_${sIdx}" min="20" max="250" value="${s.sidingCapacityCm || 65}">
+                <span class="field-hint">Trains longer than this limit will never be routed into the siding.</span>
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding-bottom:10px;">
+                  <input type="checkbox" id="stAutoDivert_${sIdx}" ${s.autoDivertOnOccupied ? 'checked' : ''}>
+                  <span><b>Auto Divert on Occupied Platform:</b> Routes train to siding if main platform is occupied.</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Multi-Switches Manager -->
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:700;font-size:0.9rem;">🔀 Station Turnout Switches (${swList.length})</span>
+                <button class="btn btn-sm" onclick="addSwitch(${sIdx})">+ Add Switch</button>
+              </div>
+              <p class="field-hint" style="margin-bottom:8px;">
+                Each switch is driven by a servo motor connected to a <b>dedicated GPIO</b> with individual angle calibration.
+              </p>
+
+              <div class="table-box">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:55px;">ID</th>
+                      <th style="width:65px;">GPIO</th>
+                      <th style="width:110px;">Default Pos</th>
+                      <th style="width:75px;">Str. Angle</th>
+                      <th style="width:75px;">Turn. Angle</th>
+                      <th>Description</th>
+                      <th style="width:105px;text-align:center;">Test</th>
+                      <th style="width:40px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${swList.map((sw, swIdx) => `
+                      <tr>
+                        <td>
+                          <input type="number" class="input-sm" id="swId_${sIdx}_${swIdx}" value="${sw.switchId || (swIdx+1)}" min="1" max="16" style="width:50px;">
+                        </td>
+                        <td>
+                          <input type="number" class="input-sm" id="swGpio_${sIdx}_${swIdx}" value="${sw.gpioPin !== undefined ? sw.gpioPin : 18}" min="0" max="48" style="width:58px;" title="Servo GPIO">
+                        </td>
+                        <td>
+                          <select class="input-sm" id="swDefPos_${sIdx}_${swIdx}">
+                            <option value="STRAIGHT" ${sw.defaultPosition === 'STRAIGHT' ? 'selected' : ''}>STRAIGHT</option>
+                            <option value="TURNOUT" ${sw.defaultPosition === 'TURNOUT' ? 'selected' : ''}>TURNOUT</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input type="number" class="input-sm" id="swAngStr_${sIdx}_${swIdx}" value="${sw.servoStraightAngle || 75}" min="0" max="180" style="width:65px;" title="Straight Angle (°)">
+                        </td>
+                        <td>
+                          <input type="number" class="input-sm" id="swAngTur_${sIdx}_${swIdx}" value="${sw.servoTurnoutAngle || 105}" min="0" max="180" style="width:65px;" title="Turnout Angle (°)">
+                        </td>
+                        <td>
+                          <input type="text" class="input-sm" id="swDesc_${sIdx}_${swIdx}" value="${sw.description || ''}" placeholder="e.g. Entry Turnout">
+                        </td>
+                        <td style="text-align:center;white-space:nowrap;">
+                          <button class="btn btn-sm" style="padding:2px 6px;" title="Test Straight" onclick="setSwitch('${s.nodeId}', ${swIdx}, 0)">➡️</button>
+                          <button class="btn primary btn-sm" style="padding:2px 6px;margin-left:4px;" title="Test Turnout" onclick="setSwitch('${s.nodeId}', ${swIdx}, 1)">🔀</button>
+                        </td>
+                        <td>
+                          <button class="btn stop btn-sm" style="padding:2px 6px;" onclick="removeSwitch(${sIdx}, ${swIdx})">✕</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Multi-Beacons Manager -->
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:700;font-size:0.9rem;">📍 Station Beacons &amp; Locators (${bList.length})</span>
+                <button class="btn btn-sm" onclick="addBeacon(${sIdx})">+ Add Beacon</button>
+              </div>
+              <p class="field-hint" style="margin-bottom:8px;">
+                Rule: Exactly <b>1 Station Arrival beacon</b> (triggers station stop and dwell). Remaining beacons should be configured as <b>Locators</b> for tracking and length calculation.
+              </p>
+
+              <div class="table-box">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:60px;">ID</th>
+                      <th style="width:65px;">GPIO</th>
+                      <th style="width:180px;">Role / Function</th>
+                      <th>Description / Sector</th>
+                      <th style="width:80px;text-align:center;">Measure Len</th>
+                      <th style="width:40px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${bList.map((b, bIdx) => `
+                      <tr>
+                        <td>
+                          <input type="number" class="input-sm" id="bId_${sIdx}_${bIdx}" value="${b.beaconId}" style="width:55px;">
+                        </td>
+                        <td>
+                          <input type="number" class="input-sm" id="bGpio_${sIdx}_${bIdx}" value="${b.gpioPin !== undefined ? b.gpioPin : 19}" min="0" max="48" style="width:58px;" title="IR Sensor/Emitter GPIO">
+                        </td>
+                        <td>
+                          <select class="input-sm" id="bRole_${sIdx}_${bIdx}">
+                            <option value="ROLE_STATION_ARRIVAL" ${b.role === 'ROLE_STATION_ARRIVAL' || b.role === 1 ? 'selected' : ''}>🚉 Station Arrival (Stop)</option>
+                            <option value="ROLE_LOCATOR" ${b.role === 'ROLE_LOCATOR' || b.role === 0 ? 'selected' : ''}>📍 Locator (Position only)</option>
+                            <option value="ROLE_APPROACH" ${b.role === 'ROLE_APPROACH' || b.role === 2 ? 'selected' : ''}>⚠️ Approach Warning</option>
+                            <option value="ROLE_SIDING" ${b.role === 'ROLE_SIDING' || b.role === 4 ? 'selected' : ''}>🔀 Siding / Refuge</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input type="text" class="input-sm" id="bDesc_${sIdx}_${bIdx}" value="${b.description || ''}" placeholder="e.g. Entry Sector 1">
+                        </td>
+                        <td style="text-align:center;">
+                          <input type="checkbox" id="bLen_${sIdx}_${bIdx}" ${b.measureTrainLength !== false ? 'checked' : ''} title="Measure train length with optical sensor">
+                        </td>
+                        <td>
+                          <button class="btn stop btn-sm" style="padding:2px 6px;" onclick="removeBeacon(${sIdx}, ${bIdx})">✕</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <button class="btn primary btn-sm" style="margin-top:10px;width:100%;" onclick="saveStationConfig(${sIdx}, '${s.nodeId}')">💾 Save Station Settings</button>
+          </div>
+        `;
+      }).join('');
     }
 
-    async function loadSettings() {
+    function addSwitch(sIdx) {
+      if (!systemConfig.stations) systemConfig.stations = [];
+      if (!systemConfig.stations[sIdx]) return;
+      if (!systemConfig.stations[sIdx].switches) systemConfig.stations[sIdx].switches = [];
+      const swList = systemConfig.stations[sIdx].switches;
+      const nextId = swList.length > 0 ? Math.max(...swList.map(s => s.switchId)) + 1 : 1;
+      swList.push({
+        switchId: nextId,
+        gpioPin: (nextId === 1 ? 18 : 18 + nextId),
+        servoStraightAngle: 75,
+        servoTurnoutAngle: 105,
+        defaultPosition: 'STRAIGHT',
+        description: 'Switch #' + nextId
+      });
+      renderStationsConfig();
+      renderManualTrackSwitches();
+    }
+
+    function removeSwitch(sIdx, swIdx) {
+      if (!systemConfig.stations || !systemConfig.stations[sIdx] || !systemConfig.stations[sIdx].switches) return;
+      systemConfig.stations[sIdx].switches.splice(swIdx, 1);
+      renderStationsConfig();
+      renderManualTrackSwitches();
+    }
+
+    function addBeacon(sIdx) {
+      if (!systemConfig.stations) systemConfig.stations = [];
+      if (!systemConfig.stations[sIdx]) return;
+      if (!systemConfig.stations[sIdx].beacons) systemConfig.stations[sIdx].beacons = [];
+      const bList = systemConfig.stations[sIdx].beacons;
+      const nextId = bList.length > 0 ? Math.max(...bList.map(b => b.beaconId)) + 1 : 10;
+      bList.push({
+        beaconId: nextId,
+        gpioPin: 19,
+        role: 'ROLE_LOCATOR',
+        description: 'Sector Locator #' + nextId,
+        measureTrainLength: true
+      });
+      renderStationsConfig();
+    }
+
+    function removeBeacon(sIdx, bIdx) {
+      if (!systemConfig.stations || !systemConfig.stations[sIdx] || !systemConfig.stations[sIdx].beacons) return;
+      systemConfig.stations[sIdx].beacons.splice(bIdx, 1);
+      renderStationsConfig();
+    }
+
+    // Save Handlers
+    async function saveGlobalConfig() {
+      if (!systemConfig.system) systemConfig.system = {};
+      systemConfig.system.layoutName = document.getElementById('cfgLayout').value.trim();
+      systemConfig.system.wifiSsid = document.getElementById('cfgSsid').value.trim();
+      systemConfig.system.wifiPassword = document.getElementById('cfgPass').value;
+      systemConfig.system.wifiChannel = parseInt(document.getElementById('cfgChannel').value) || 1;
+      systemConfig.system.headwaySafeSec = parseInt(document.getElementById('cfgSafeSec').value) || 12;
+      systemConfig.system.headwayCautionSec = parseInt(document.getElementById('cfgCautionSec').value) || 6;
+      systemConfig.system.headwaySpeedTrimPct = parseInt(document.getElementById('cfgTrimPct').value) || 40;
+
+      await postConfig();
+      alert('Global configuration saved to Master Gateway!');
+    }
+
+    async function saveLocoConfig(idx, nodeId) {
+      if (!systemConfig.locomotives) systemConfig.locomotives = [];
+      let item = systemConfig.locomotives.find(l => l.nodeId === nodeId);
+      if (!item) { item = { nodeId: nodeId }; systemConfig.locomotives.push(item); }
+
+      item.name = document.getElementById('locoName_' + idx).value.trim();
+      item.maxSpeed = parseInt(document.getElementById('locoMax_' + idx).value) || 70;
+      item.learningSpeed = parseInt(document.getElementById('locoLearn_' + idx).value) || 35;
+      item.accelRate = parseFloat(document.getElementById('locoAcc_' + idx).value) || 40.0;
+      item.decelRate = parseFloat(document.getElementById('locoDec_' + idx).value) || 60.0;
+      item.brakeOffsetMs = parseInt(document.getElementById('locoBrake_' + idx).value) || 450;
+      item.dwellTimeSec = parseInt(document.getElementById('locoDwell_' + idx).value) || 12;
+      item.measuredLengthCm = parseInt(document.getElementById('locoLen_' + idx).value) || 28;
+
+      await postConfig();
+      alert('Locomotive parameters for ' + nodeId + ' saved!');
+    }
+
+    async function saveStationConfig(sIdx, nodeId) {
+      if (!systemConfig.stations) systemConfig.stations = [];
+      let item = systemConfig.stations.find(s => s.nodeId === nodeId);
+      if (!item) { item = { nodeId: nodeId }; systemConfig.stations.push(item); }
+
+      item.name = document.getElementById('stName_' + sIdx).value.trim();
+      item.dwellTimeSec = parseInt(document.getElementById('stDwell_' + sIdx).value) || 10;
+      item.sidingCapacityCm = parseInt(document.getElementById('stSiding_' + sIdx).value) || 65;
+      item.autoDivertOnOccupied = document.getElementById('stAutoDivert_' + sIdx).checked;
+
+      // Read switches
+      const swRows = document.querySelectorAll(`[id^="swId_${sIdx}_"]`);
+      const updatedSwitches = [];
+      swRows.forEach((r, swIdx) => {
+        const idVal = parseInt(document.getElementById(`swId_${sIdx}_${swIdx}`).value) || (swIdx + 1);
+        const gpioVal = parseInt(document.getElementById(`swGpio_${sIdx}_${swIdx}`).value) || 18;
+        const defPos = document.getElementById(`swDefPos_${sIdx}_${swIdx}`).value || 'STRAIGHT';
+        const angStr = parseInt(document.getElementById(`swAngStr_${sIdx}_${swIdx}`).value) || 75;
+        const angTur = parseInt(document.getElementById(`swAngTur_${sIdx}_${swIdx}`).value) || 105;
+        const descEl = document.getElementById(`swDesc_${sIdx}_${swIdx}`);
+        const descVal = descEl ? descEl.value.trim() : '';
+        updatedSwitches.push({
+          switchId: idVal,
+          gpioPin: gpioVal,
+          servoStraightAngle: angStr,
+          servoTurnoutAngle: angTur,
+          defaultPosition: defPos,
+          description: descVal
+        });
+      });
+      item.switches = updatedSwitches;
+      if (updatedSwitches.length > 0) {
+        item.defaultSwitch = updatedSwitches[0].defaultPosition;
+        item.switchGpioPin = updatedSwitches[0].gpioPin;
+        item.servoStraightAngle = updatedSwitches[0].servoStraightAngle;
+        item.servoTurnoutAngle = updatedSwitches[0].servoTurnoutAngle;
+      }
+
+      // Read beacons
+      const rows = document.querySelectorAll(`[id^="bId_${sIdx}_"]`);
+      const updatedBeacons = [];
+      let arrivalCount = 0;
+      rows.forEach((r, bIdx) => {
+        const role = document.getElementById(`bRole_${sIdx}_${bIdx}`).value;
+        if (role === 'ROLE_STATION_ARRIVAL') arrivalCount++;
+        const bGpio = parseInt(document.getElementById(`bGpio_${sIdx}_${bIdx}`).value) || 19;
+        updatedBeacons.push({
+          beaconId: parseInt(document.getElementById(`bId_${sIdx}_${bIdx}`).value) || (10 + bIdx),
+          gpioPin: bGpio,
+          role: role,
+          description: document.getElementById(`bDesc_${sIdx}_${bIdx}`).value.trim(),
+          measureTrainLength: document.getElementById(`bLen_${sIdx}_${bIdx}`).checked
+        });
+      });
+
+      if (arrivalCount > 1) {
+        alert('Warning: Exactly ONE beacon per station should be ROLE_STATION_ARRIVAL (Arrival/Stop). Remaining beacons should be Locators.');
+      }
+
+      item.beacons = updatedBeacons;
+      item.beaconCount = updatedBeacons.length;
+
+      await postConfig();
+      renderManualTrackSwitches();
+      alert('Settings saved: ' + updatedSwitches.length + ' switch(es) and ' + updatedBeacons.length + ' beacon(s) saved for station!');
+    }
+
+    async function postConfig() {
       try {
-        const res = await fetch('/api/settings');
-        const data = await res.json();
-        document.getElementById('cfgSsid').value = data.wifiSsid || 'LegoTrain_Master';
-        document.getElementById('cfgPass').value = data.wifiPassword || '';
-        document.getElementById('cfgChannel').value = data.wifiChannel || 1;
-      } catch(e){}
-    }
-
-    async function saveSettings() {
-      const ssid = document.getElementById('cfgSsid').value.trim();
-      const pass = document.getElementById('cfgPass').value;
-      const chan = parseInt(document.getElementById('cfgChannel').value) || 1;
-      if (!ssid) { alert('SSID cannot be empty!'); return; }
-      if (pass.length > 0 && pass.length < 8) { alert('Password must be at least 8 characters (or leave empty for open network)!'); return; }
-
-      document.getElementById('cfgMsg').textContent = 'Saving settings...';
-      try {
-        const res = await fetch('/api/settings', {
+        await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wifiSsid: ssid, wifiPassword: pass, wifiChannel: chan, apMode: true })
+          body: JSON.stringify(systemConfig)
         });
-        if (res.ok) {
-          document.getElementById('cfgMsg').textContent = '✅ Saved! Restarting Master... Reconnect to Wi-Fi in 10 seconds.';
-          fetch('/api/restart', { method: 'POST' });
-        }
       } catch(e) {
-        document.getElementById('cfgMsg').textContent = '❌ Error saving settings.';
+        alert('Error sending configuration: ' + e.message);
       }
     }
-
-    // Initial load
-    refreshNodes();
-    loadScenarios();
-    setInterval(refreshNodes, 3000);
   </script>
 </body>
 </html>
@@ -522,9 +1210,7 @@ void LocoWebServer::setupRoutes() {
     // API: System Status
     _server.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
         JsonDocument doc;
-        doc["mode"] = (_currentMode == MODE_AUTOMATIC) ? "AUTOMATIC" : "MANUAL";
-        doc["scenarioRunning"] = _scenarioRunning;
-        doc["activeScenario"] = _activeScenarioName;
+        doc["mode"] = (_currentMode == MODE_AUTONOMOUS) ? "AUTONOMOUS" : "MANUAL";
         doc["uptimeSec"] = millis() / 1000;
         doc["freeHeap"] = ESP.getFreeHeap();
         doc["nodeCount"] = ESPNowManager::instance().getDiscoveredNodes().size();
@@ -591,6 +1277,25 @@ void LocoWebServer::setupRoutes() {
         request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Failed to pair node\"}");
     });
 
+    // API: Unpair / Remove Locomotive from this Master
+    _server.on("/api/locos/unpair", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        JsonDocument doc;
+        if (!deserializeJson(doc, (char*)data)) {
+            String nodeId = doc["nodeId"] | "";
+            if (nodeId.length() > 0) {
+                bool ok = ESPNowManager::instance().unpairNode(nodeId.c_str());
+                ConfigStore::instance().removeLoco(nodeId);
+                if (_onLocoControlCb) {
+                    _onLocoControlCb(nodeId, 0, 2, 0, 0, 0, 0); // Halt & clear
+                }
+                request->send(200, "application/json", "{\"status\":\"unpaired\",\"nodeId\":\"" + nodeId + "\"}");
+                return;
+            }
+        }
+        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Failed to unpair node\"}");
+    });
+
     // API: Rename Node
     _server.on("/api/nodes/rename", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -607,82 +1312,63 @@ void LocoWebServer::setupRoutes() {
         request->send(400, "application/json", "{\"status\":\"error\"}");
     });
 
-    // API: List Scenarios
-    _server.on("/api/scenarios", HTTP_GET, [](AsyncWebServerRequest *request) {
-        JsonDocument doc;
-        JsonArray arr = doc.to<JsonArray>();
-        std::vector<String> list = ConfigStore::instance().listScenarios();
-        for (const auto& f : list) {
-            arr.add(f);
-        }
-        String response;
-        serializeJson(doc, response);
-        request->send(200, "application/json", response);
+    // API: Unified Configuration (GET / POST)
+    _server.on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String json = ConfigStore::instance().serializeUnifiedConfigJson();
+        request->send(200, "application/json", json);
     });
 
-    // API: Get Scenario Content
-    _server.on("/api/scenario", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (!request->hasParam("name")) {
-            request->send(400, "application/json", "{\"error\":\"Missing name param\"}");
-            return;
+    _server.on("/api/config", HTTP_POST, [this](AsyncWebServerRequest *request) {}, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        String json = String((char*)data).substring(0, len);
+        if (ConfigStore::instance().deserializeUnifiedConfigJson(json)) {
+            if (_onConfigUpdatedCb) _onConfigUpdatedCb();
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         }
-        String filename = request->getParam("name")->value();
-        String content = ConfigStore::instance().readScenarioRaw(filename);
-        if (content.length() == 0) {
-            request->send(404, "application/json", "{\"error\":\"Not found\"}");
-            return;
-        }
-        request->send(200, "text/csv", content);
     });
 
-    // API: Save / Import Scenario (POST)
-    _server.on("/api/scenario", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    // API: Circuit Topology (GET / POST)
+    _server.on("/api/topology", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String json = ConfigStore::instance().loadTopologyJson();
+        request->send(200, "application/json", json);
+    });
+
+    _server.on("/api/topology", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        String filename = "";
-        if (request->hasParam("name")) {
-            filename = request->getParam("name")->value();
-        } else if (request->hasParam("name", true)) {
-            filename = request->getParam("name", true)->value();
-        }
-        if (filename.length() == 0) {
-            request->send(400, "application/json", "{\"error\":\"Missing filename\"}");
-            return;
-        }
-        String content = String((char*)data).substring(0, len);
-        if (ConfigStore::instance().saveScenario(filename, content)) {
-            request->send(200, "application/json", "{\"status\":\"saved\"}");
-        } else {
-            request->send(500, "application/json", "{\"error\":\"Failed to save\"}");
-        }
+        String json = String((char*)data).substring(0, len);
+        ConfigStore::instance().saveTopologyJson(json);
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
-    // API: Delete Scenario
-    _server.on("/api/scenario", HTTP_DELETE, [](AsyncWebServerRequest *request) {
-        if (!request->hasParam("name")) {
-            request->send(400, "application/json", "{\"error\":\"Missing name param\"}");
-            return;
-        }
-        String filename = request->getParam("name")->value();
-        if (ConfigStore::instance().deleteScenario(filename)) {
-            request->send(200, "application/json", "{\"status\":\"deleted\"}");
-        } else {
-            request->send(500, "application/json", "{\"error\":\"Failed to delete\"}");
-        }
-    });
-
-    // API: Start / Stop Scenario
-    _server.on("/api/scenario/run", HTTP_POST, [this](AsyncWebServerRequest *request) {}, NULL,
+    // API: Learning Lap Start / Stop / Reset
+    _server.on("/api/learning/start", HTTP_POST, [this](AsyncWebServerRequest *request) {}, NULL,
     [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
         JsonDocument doc;
         deserializeJson(doc, (char*)data);
-        String name = doc["scenario"] | "default.csv";
-        if (_onScenarioRunCb) _onScenarioRunCb(name, true);
-        request->send(200, "application/json", "{\"status\":\"running\"}");
+        String loco = doc["target"] | (doc["targetLocoId"] | "ALL");
+        uint8_t spd = doc["speed"] | (doc["calibrationSpeed"] | 35);
+        if (_onLearningLapCb) _onLearningLapCb(loco, true, spd);
+        request->send(200, "application/json", "{\"status\":\"started\"}");
     });
 
-    _server.on("/api/scenario/stop", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        if (_onScenarioRunCb) _onScenarioRunCb("", false);
+    _server.on("/api/learning/stop", HTTP_POST, [this](AsyncWebServerRequest *request) {}, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        JsonDocument doc;
+        deserializeJson(doc, (char*)data);
+        String loco = doc["target"] | (doc["targetLocoId"] | "ALL");
+        if (_onLearningLapCb) _onLearningLapCb(loco, false, 0);
         request->send(200, "application/json", "{\"status\":\"stopped\"}");
+    });
+
+    _server.on("/api/learning/reset", HTTP_POST, [this](AsyncWebServerRequest *request) {}, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        JsonDocument doc;
+        deserializeJson(doc, (char*)data);
+        String loco = doc["target"] | (doc["targetLocoId"] | "ALL");
+        if (_onLearningLapCb) _onLearningLapCb(loco, false, 0);
+        request->send(200, "application/json", "{\"status\":\"reset\"}");
     });
 
     // API: Change Mode
@@ -691,7 +1377,7 @@ void LocoWebServer::setupRoutes() {
         JsonDocument doc;
         deserializeJson(doc, (char*)data);
         String mStr = doc["mode"] | "MANUAL";
-        _currentMode = (mStr == "AUTOMATIC") ? MODE_AUTOMATIC : MODE_MANUAL;
+        _currentMode = (mStr == "AUTONOMOUS" || mStr == "AUTOMATIC") ? MODE_AUTONOMOUS : MODE_MANUAL;
         if (_onModeChangeCb) _onModeChangeCb(_currentMode);
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
@@ -719,7 +1405,8 @@ void LocoWebServer::setupRoutes() {
         String target = doc["target"] | "";
         uint8_t pos = doc["position"] | 0;
         uint16_t dwell = doc["dwell"] | 0;
-        if (_onTrackControlCb) _onTrackControlCb(target, pos, dwell);
+        uint8_t swIdx = doc["switchIndex"] | (doc["switchId"] | 0);
+        if (_onTrackControlCb) _onTrackControlCb(target, pos, dwell, swIdx);
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
@@ -727,11 +1414,11 @@ void LocoWebServer::setupRoutes() {
     _server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
         const SystemSettings& s = ConfigStore::instance().getSettings();
         JsonDocument doc;
+        doc["layoutName"]   = s.layoutName;
         doc["wifiSsid"]     = s.wifiSsid;
         doc["wifiPassword"] = s.wifiPassword;
         doc["apMode"]       = s.apMode;
         doc["wifiChannel"]  = s.wifiChannel;
-        doc["activeScenario"] = s.activeScenario;
         String res;
         serializeJson(doc, res);
         request->send(200, "application/json", res);
@@ -813,17 +1500,4 @@ void LocoWebServer::broadcastTelemetry(const String& type, const JsonDocument& d
     String str;
     serializeJson(doc, str);
     _ws.textAll(str);
-}
-
-void LocoWebServer::notifyScenarioStep(uint16_t stepId, const String& action, const String& target, const String& status) {
-    JsonDocument doc;
-    doc["event"] = "scenario_step";
-    JsonObject d = doc["data"].to<JsonObject>();
-    d["stepId"] = stepId;
-    d["action"] = action;
-    d["target"] = target;
-    d["status"] = status;
-    String str;
-    serializeJson(doc, str);
-    broadcastWs(str);
 }

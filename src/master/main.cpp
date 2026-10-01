@@ -5,9 +5,20 @@
 #include "ConfigStore.h"
 #include "ESPNowManager.h"
 #include "LocoWebServer.h"
-#include "ScenarioEngine.h"
+#include "TopologyManager.h"
 
 static DNSServer g_dnsServer;
+
+struct ActiveLocoCmd {
+    char targetNodeId[16];
+    int8_t targetSpeed;
+    uint8_t brake;
+    uint8_t lightsFront;
+    uint8_t lightsRear;
+    uint8_t lightsCab;
+    uint8_t lightingMode;
+};
+static std::vector<ActiveLocoCmd> g_activeLocoCmds;
 
 static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int len) {
     if (len <= 0 || !data) return;
@@ -26,17 +37,19 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
 
             // Broadcast telemetry to connected Web UI clients
             JsonDocument doc;
-            doc["nodeId"]       = t->nodeId;
-            doc["speed"]        = t->currentSpeed;
-            doc["currentBlock"] = t->currentBlockId;
-            doc["batteryMv"]    = t->batteryMv;
+            doc["nodeId"]           = t->nodeId;
+            doc["speed"]            = t->currentSpeed;
+            doc["currentBlock"]     = t->currentBlockId;
+            doc["batteryMv"]        = t->batteryMv;
+            doc["locoState"]        = t->locoState;
+            doc["etaSeconds"]       = t->etaSeconds;
+            doc["measuredLengthCm"] = t->measuredLengthCm;
+            doc["lapCount"]         = t->lapCount;
             LocoWebServer::instance().broadcastTelemetry("loco_telemetry", doc);
 
-            // If train crossed a new beacon, hook into Scenario Engine
+            // Hook into Topology Manager
             if (blockChanged && t->currentBlockId > 0) {
-                ScenarioEngine::instance().onBeaconDetected(t->nodeId, t->currentBlockId);
-                // Also broadcast ETA to track stations
-                ScenarioEngine::instance().updateStationEta("ALL", t->nodeId, t->currentBlockId, t->currentSpeed);
+                TopologyManager::instance().onBeaconDetected(t->nodeId, t->currentBlockId, t->currentSpeed);
             }
         }
     } else if (msgType == MSG_TRACK_TELEMETRY && len >= (int)sizeof(MsgTrackTelemetry)) {
@@ -51,15 +64,24 @@ static void handleIncomingEspNow(const uint8_t* mac, const uint8_t* data, int le
 
             // Broadcast track state to Web UI
             JsonDocument doc;
-            doc["nodeId"]       = t->nodeId;
-            doc["switchState"]  = (t->switchPosition == SWITCH_STRAIGHT) ? "STRAIGHT" : "TURNOUT";
-            doc["beamOccupied"] = (bool)t->beamOccupied;
+            doc["nodeId"]               = t->nodeId;
+            doc["switchState"]          = (t->switchPosition == SWITCH_STRAIGHT) ? "STRAIGHT" : "TURNOUT";
+            doc["beamOccupied"]         = (bool)t->beamOccupied;
+            doc["currentSignalAspect"]  = t->currentSignalAspect;
+            doc["lastMeasuredLengthCm"] = t->lastMeasuredLengthCm;
+            doc["dwellRemainingSec"]   = t->dwellRemainingSec;
             LocoWebServer::instance().broadcastTelemetry("track_telemetry", doc);
 
             if (occChanged) {
-                ScenarioEngine::instance().onTrackOccupancyChanged(t->nodeId, (bool)t->beamOccupied);
+                TopologyManager::instance().onTrackOccupancyChanged(t->nodeId, (bool)t->beamOccupied);
             }
         }
+    } else if (msgType == MSG_CIRCUIT_STATUS && len >= (int)sizeof(MsgCircuitStatus)) {
+        const MsgCircuitStatus* s = (const MsgCircuitStatus*)data;
+        TopologyManager::instance().onLocoCircuitStatus(*s);
+    } else if (msgType == MSG_TRAIN_LENGTH_REPORT && len >= (int)sizeof(MsgTrainLengthReport)) {
+        const MsgTrainLengthReport* r = (const MsgTrainLengthReport*)data;
+        TopologyManager::instance().onTrainLengthReport(*r);
     }
 }
 
@@ -68,14 +90,14 @@ void setup() {
     delay(1000);
     Serial.println();
     Serial.println(F("=================================================="));
-    Serial.println(F("  LEGO TRAIN MASTER GATEWAY & BRAIN (V2.0)        "));
+    Serial.println(F("  LEGO TRAIN MASTER GATEWAY & SUPERVISOR          "));
     Serial.println(F("=================================================="));
 
     // 1. Initialize Configuration & LittleFS
     ConfigStore::instance().begin();
     const SystemSettings& settings = ConfigStore::instance().getSettings();
-    Serial.printf("[Config] Loaded Settings: SSID='%s', apMode=%d, Ch=%d\n",
-                  settings.wifiSsid.c_str(), (int)settings.apMode, (int)settings.wifiChannel);
+    Serial.printf("[Config] Loaded Settings: Layout='%s', SSID='%s', Ch=%d\n",
+                  settings.layoutName.c_str(), settings.wifiSsid.c_str(), (int)settings.wifiChannel);
 
     // 2. Wi-Fi Configuration (AP or STA)
     WiFi.persistent(false);
@@ -173,16 +195,57 @@ void setup() {
         } else {
             ESPNowManager::instance().sendToNode(target.c_str(), &cmd, sizeof(cmd));
         }
+
+        // Maintain active command state for periodic failsafe refresh
+        if (speed == 0 && brake == 2) {
+            for (auto it = g_activeLocoCmds.begin(); it != g_activeLocoCmds.end(); ) {
+                if (strcmp(it->targetNodeId, target.c_str()) == 0) {
+                    it = g_activeLocoCmds.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+            return;
+        }
+
+        bool found = false;
+        for (auto& c : g_activeLocoCmds) {
+            if (strcmp(c.targetNodeId, target.c_str()) == 0) {
+                c.targetSpeed = speed;
+                c.brake = brake;
+                c.lightsFront = lf;
+                c.lightsRear = lr;
+                c.lightsCab = lc;
+                c.lightingMode = lm;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            ActiveLocoCmd c = {};
+            strncpy(c.targetNodeId, target.c_str(), sizeof(c.targetNodeId) - 1);
+            c.targetSpeed = speed;
+            c.brake = brake;
+            c.lightsFront = lf;
+            c.lightsRear = lr;
+            c.lightsCab = lc;
+            c.lightingMode = lm;
+            g_activeLocoCmds.push_back(c);
+        }
     });
 
-    LocoWebServer::instance().onTrackControl([](const String& target, uint8_t switchPos, uint16_t dwell) {
+    LocoWebServer::instance().onTrackControl([](const String& target, uint8_t switchPos, uint16_t dwell, uint8_t switchIndex) {
         MsgTrackCommand cmd = {};
         cmd.msgType = MSG_TRACK_COMMAND;
         strncpy(cmd.targetNodeId, target.c_str(), sizeof(cmd.targetNodeId) - 1);
-        cmd.switchIndex = 0;
+        cmd.switchIndex = switchIndex;
         cmd.switchPosition = switchPos;
         cmd.dwellTimeSec = dwell;
-        ESPNowManager::instance().sendToNode(target.c_str(), &cmd, sizeof(cmd));
+        if (target == "ALL") {
+            ESPNowManager::instance().sendBroadcast(&cmd, sizeof(cmd));
+        } else {
+            ESPNowManager::instance().sendToNode(target.c_str(), &cmd, sizeof(cmd));
+        }
     });
 
     LocoWebServer::instance().onEmergencyStop([]() {
@@ -192,30 +255,40 @@ void setup() {
         em.reasonCode = 0; // Manual Web UI button
         strncpy(em.sourceNodeId, "MASTER", sizeof(em.sourceNodeId) - 1);
         ESPNowManager::instance().sendBroadcast(&em, sizeof(em));
-        ScenarioEngine::instance().stopScenario();
+
+        // Clear active running speeds
+        for (auto& c : g_activeLocoCmds) {
+            c.targetSpeed = 0;
+            c.brake = 2;
+        }
     });
 
-    LocoWebServer::instance().onScenarioRun([](const String& scenarioName, bool run) {
-        if (run) {
-            LocoWebServer::instance().setOperatingMode(MODE_AUTOMATIC);
-            ScenarioEngine::instance().startScenario(scenarioName);
+    LocoWebServer::instance().onLearningLap([](const String& locoId, bool start, uint8_t speed) {
+        if (start) {
+            TopologyManager::instance().startLearningLap(locoId.c_str(), speed);
         } else {
-            ScenarioEngine::instance().stopScenario();
-            LocoWebServer::instance().setOperatingMode(MODE_MANUAL);
+            TopologyManager::instance().stopLearningLap(locoId.c_str());
         }
     });
 
     LocoWebServer::instance().onModeChange([](OperatingMode mode) {
-        if (mode == MODE_MANUAL) {
-            ScenarioEngine::instance().stopScenario();
+        Serial.printf("[Master] Mode changed to: %s\n", (mode == MODE_AUTONOMOUS) ? "AUTONOMOUS" : "MANUAL");
+        MsgLearningCmd cmd = {};
+        cmd.msgType = MSG_LEARNING_CMD;
+        strncpy(cmd.targetLocoId, "ALL", sizeof(cmd.targetLocoId) - 1);
+        if (mode == MODE_AUTONOMOUS) {
+            cmd.command = 3; // START_AUTONOMOUS
+            cmd.calibrationSpeed = 35;
+        } else {
+            cmd.command = 0; // STOP_AUTONOMOUS -> return to manual stop
         }
-        Serial.printf("[Master] Mode changed to: %s\n", (mode == MODE_AUTOMATIC) ? "AUTOMATIC" : "MANUAL");
+        ESPNowManager::instance().sendBroadcast(&cmd, sizeof(cmd));
     });
 
     LocoWebServer::instance().begin(80);
 
-    // 5. Initialize Scenario Engine
-    ScenarioEngine::instance().begin();
+    // 5. Initialize Topology Manager
+    TopologyManager::instance().begin();
 
     Serial.println(F("[Master] Startup complete. System is ready!"));
 }
@@ -223,6 +296,32 @@ void setup() {
 void loop() {
     g_dnsServer.processNextRequest();
     ESPNowManager::instance().update();
-    ScenarioEngine::instance().update();
+    TopologyManager::instance().update();
+
+    // Periodic refresh of active running locomotives (every 1500ms) to ensure continuous cruising in manual mode
+    static uint32_t lastLocoRefreshMs = 0;
+    uint32_t now = millis();
+    if (now - lastLocoRefreshMs >= 1500) {
+        lastLocoRefreshMs = now;
+        for (const auto& c : g_activeLocoCmds) {
+            if (c.targetSpeed != 0) {
+                MsgLocoCommand cmd = {};
+                cmd.msgType = MSG_LOCO_COMMAND;
+                strncpy(cmd.targetNodeId, c.targetNodeId, sizeof(cmd.targetNodeId) - 1);
+                cmd.targetSpeed = c.targetSpeed;
+                cmd.brake = c.brake;
+                cmd.lightsFront = c.lightsFront;
+                cmd.lightsRear = c.lightsRear;
+                cmd.lightsCab = c.lightsCab;
+                cmd.lightingMode = c.lightingMode;
+                if (strcmp(c.targetNodeId, "ALL") == 0) {
+                    ESPNowManager::instance().sendBroadcast(&cmd, sizeof(cmd));
+                } else {
+                    ESPNowManager::instance().sendToNode(c.targetNodeId, &cmd, sizeof(cmd));
+                }
+            }
+        }
+    }
+
     delay(2);
 }

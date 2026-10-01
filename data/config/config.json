@@ -1,0 +1,53 @@
+{
+  "system": {
+    "layoutName": "Lego Central Layout",
+    "wifiSsid": "LegoTrain_Master",
+    "wifiPassword": "",
+    "apMode": true,
+    "wifiChannel": 1,
+    "headwaySafeSec": 12,
+    "headwayCautionSec": 6,
+    "headwaySpeedTrimPct": 40
+  },
+  "locomotives": [
+    {
+      "nodeId": "LOCO_4B5C",
+      "name": "Cargo Express",
+      "maxSpeed": 70,
+      "learningSpeed": 35,
+      "accelRate": 40.0,
+      "decelRate": 60.0,
+      "brakeOffsetMs": 450,
+      "dwellTimeSec": 12,
+      "lightMode": "AUTO",
+      "measuredLengthCm": 28
+    }
+  ],
+  "stations": [
+    {
+      "nodeId": "TRACK_1A2B",
+      "name": "Central Station",
+      "defaultSwitch": "STRAIGHT",
+      "servoStraightAngle": 75,
+      "servoTurnoutAngle": 105,
+      "dwellTimeSec": 10,
+      "autoDivertOnOccupied": true,
+      "sidingCapacityCm": 65,
+      "beaconCount": 2,
+      "beacons": [
+        {
+          "beaconId": 10,
+          "role": "ROLE_LOCATOR",
+          "description": "Sector 1 Approach Tracker",
+          "measureTrainLength": true
+        },
+        {
+          "beaconId": 11,
+          "role": "ROLE_STATION_ARRIVAL",
+          "description": "Platform 1 Arrival Stop",
+          "measureTrainLength": true
+        }
+      ]
+    }
+  ]
+}
