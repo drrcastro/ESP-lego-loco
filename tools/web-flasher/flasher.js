@@ -76,7 +76,7 @@ async function connectSerial() {
     await serialPort.open({ baudRate: 115200 });
 
     document.getElementById("btnConnectSerial").textContent = "🔌 Disconnect";
-    document.getElementById("btnConnectSerial").className = "btn btn-danger";
+    document.getElementById("btnConnectSerial").className = "btn btn-lego-red btn-sm";
     document.getElementById("btnResetEsp").disabled = false;
     document.getElementById("btnFlashAdvanced").disabled = false;
 
@@ -101,7 +101,7 @@ async function disconnectSerial() {
   }
 
   document.getElementById("btnConnectSerial").textContent = "🔌 Connect USB Port";
-  document.getElementById("btnConnectSerial").className = "btn btn-outline";
+  document.getElementById("btnConnectSerial").className = "btn btn-lego-blue btn-sm";
   document.getElementById("btnResetEsp").disabled = true;
   document.getElementById("btnFlashAdvanced").disabled = true;
 

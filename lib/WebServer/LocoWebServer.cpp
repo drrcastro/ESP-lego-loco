@@ -134,43 +134,44 @@ void LocoWebServer::setupRoutes() {
   <title>Lego Loco Controller</title>
   <style>
     :root {
-      --bg: #090d16; --card: #121826; --card-alt: #172033; --input: #0b0f19;
-      --primary: #00d2ff; --success: #00f29b; --danger: #ff3366; --warning: #ffb703;
-      --text: #f0f4fc; --text-dim: #8a99b5; --border: rgba(255,255,255,0.1);
+      --bg: #151821; --card: #202532; --card-alt: #181D27; --input: #12141C;
+      --primary: #FED100; --success: #00852B; --danger: #D11013; --warning: #FED100; --accent: #0055BF;
+      --text: #ffffff; --text-dim: #A3AFBF; --border: rgba(255,255,255,0.12);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; min-height: 100vh; padding-bottom: 50px; }
     
-    /* Header */
-    .header { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+    /* Header - Sharp LEGO Tile */
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; border: 2px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
     .header h1 { font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
     .header h1 span { color: var(--primary); }
     .header-right { display: flex; align-items: center; gap: 8px; }
-    .status-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 12px; background: rgba(0,242,155,0.15); color: var(--success); font-weight: 700; }
-    .status-badge.offline { background: rgba(255,51,102,0.15); color: var(--danger); }
+    .status-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 0; background: rgba(0,133,43,0.25); color: #8EE6A8; font-weight: 800; border: 1px solid var(--success); }
+    .status-badge.offline { background: rgba(209,16,19,0.25); color: #FFA3A5; border-color: var(--danger); }
     
-    /* Emergency Bar */
+    /* Emergency Bar - LEGO Brick Red Button */
     .estop-bar { margin-bottom: 12px; }
-    .btn-estop { width: 100%; background: linear-gradient(135deg, #ff3366, #c9184a); border: none; color: #fff; padding: 13px; font-size: 1.1rem; font-weight: 800; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(255,51,102,0.4); }
+    .btn-estop { width: 100%; background: linear-gradient(180deg, #E3000B 0%, #D11013 100%); border: 2px solid #FFA3A5; outline: 2px solid #8A0B0E; color: #fff; padding: 13px; font-size: 1.1rem; font-weight: 800; border-radius: 0; cursor: pointer; box-shadow: 0 4px 0 #8A0B0E, 0 6px 16px rgba(209,16,19,0.4); }
+    .btn-estop:active { transform: translateY(3px); box-shadow: 0 1px 0 #8A0B0E; }
     
-    /* Nav Tabs */
-    .nav-tabs { display: flex; gap: 6px; background: var(--card); padding: 6px; border-radius: 12px; margin-bottom: 14px; border: 1px solid var(--border); overflow-x: auto; }
-    .nav-btn { flex: 1; min-width: 80px; background: transparent; border: none; color: var(--text-dim); padding: 9px 12px; font-size: 0.85rem; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s; white-space: nowrap; text-align: center; }
-    .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 2px 8px rgba(0,210,255,0.3); }
+    /* Nav Tabs - Sharp Brick Plates */
+    .nav-tabs { display: flex; gap: 4px; background: var(--card); padding: 4px; border-radius: 0; margin-bottom: 14px; border: 2px solid var(--border); overflow-x: auto; }
+    .nav-btn { flex: 1; min-width: 80px; background: transparent; border: none; color: var(--text-dim); padding: 9px 12px; font-size: 0.85rem; font-weight: 700; border-radius: 0; cursor: pointer; transition: all 0.2s; white-space: nowrap; text-align: center; }
+    .nav-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #003B85; font-weight: 800; }
     .tab-content { display: none; }
     .tab-content.active { display: block; animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Cards */
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    /* Cards - Sharp Rectangular Bricks */
+    .card { background: var(--card); border: 2px solid var(--border); border-radius: 0; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
     .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-desc { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4; }
     
-    /* Forms */
+    /* Forms - Sharp Inputs */
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
-    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 9px 12px; border-radius: 8px; font-size: 0.9rem; }
-    .form-control:focus { outline: none; border-color: var(--primary); }
+    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1.5px solid var(--border); padding: 9px 12px; border-radius: 0; font-size: 0.9rem; }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(254,209,0,0.3); }
     .field-hint { display: block; font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
     
     /* Grid */
@@ -180,34 +181,35 @@ void LocoWebServer::setupRoutes() {
     .throttle-box { margin: 14px 0; }
     .speed-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
     .speed-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
-    .slider { width: 100%; height: 16px; border-radius: 8px; background: var(--input); -webkit-appearance: none; outline: none; }
-    .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+    .slider { width: 100%; height: 16px; border-radius: 0; background: var(--input); -webkit-appearance: none; outline: none; border: 1.5px solid var(--border); }
+    .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFF3A8 0%, #FED100 70%, #B89200 100%); border: 2px solid #fff; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
-    .btn { background: #161e31; border: 1px solid var(--border); color: #fff; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; border-radius: 8px; cursor: pointer; text-align: center; }
-    .btn.primary { background: linear-gradient(135deg, #00d2ff, #0077b6); color: #000; font-weight: 800; border: none; }
-    .btn.stop { background: rgba(255,51,102,0.15); color: var(--danger); border-color: rgba(255,51,102,0.4); }
-    .btn.success { background: rgba(0,242,155,0.15); color: var(--success); border-color: rgba(0,242,155,0.4); }
+    .btn { background: #374151; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; border-radius: 0; cursor: pointer; text-align: center; box-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+    .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+    .btn.primary { background: var(--accent); color: #fff; font-weight: 800; border: none; box-shadow: 0 3px 0 #003B85; }
+    .btn.stop { background: var(--danger); color: #fff; border-color: rgba(255,255,255,0.2); box-shadow: 0 3px 0 #8A0B0E; }
+    .btn.success { background: var(--success); color: #fff; border-color: rgba(255,255,255,0.2); box-shadow: 0 3px 0 #005C1E; }
     .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
     
     /* Config Subtabs */
-    .subtabs-bar { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; padding-bottom: 8px; }
-    .subtab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
-    .subtab-btn.active { background: rgba(0,210,255,0.15); border-color: rgba(0,210,255,0.4); color: var(--primary); }
+    .subtabs-bar { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 14px; padding-bottom: 8px; }
+    .subtab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; padding: 7px 14px; border-radius: 0; cursor: pointer; }
+    .subtab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #003B85; }
     .subtab-pane { display: none; }
     .subtab-pane.active { display: block; }
     
     /* Tables */
-    .table-box { width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+    .table-box { width: 100%; overflow-x: auto; margin-top: 10px; border: 1.5px solid var(--border); border-radius: 0; }
     table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    th { background: rgba(255,255,255,0.04); color: var(--text-dim); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255,255,255,0.06); color: var(--primary); padding: 8px 10px; text-align: left; border-bottom: 1.5px solid var(--border); font-weight: 800; }
     td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-    .input-sm { background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; font-size: 0.8rem; width: 100%; }
+    .input-sm { background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 0; font-size: 0.8rem; width: 100%; }
     
-    .mode-toggle-group { display: flex; background: var(--input); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
-    .mode-btn-top { background: transparent; border: none; color: var(--text-dim); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
-    .mode-btn-top.active { background: var(--primary); color: #000; box-shadow: 0 1px 6px rgba(0,210,255,0.3); }
+    .mode-toggle-group { display: flex; background: var(--input); padding: 3px; border-radius: 0; border: 1.5px solid var(--border); }
+    .mode-btn-top { background: transparent; border: none; color: var(--text-dim); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 0; cursor: pointer; transition: all 0.2s; }
+    .mode-btn-top.active { background: var(--primary); color: #000; font-weight: 800; box-shadow: 0 2px 0 #B89200; }
     .notice { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }
-    .notice-warn { background: rgba(255,183,3,0.12); color: var(--warning); border: 1px solid rgba(255,183,3,0.3); padding: 8px 10px; border-radius: 8px; font-size: 0.78rem; margin: 8px 0; }
+    .notice-warn { background: rgba(254,209,0,0.12); color: var(--warning); border: 1.5px dashed var(--warning); padding: 8px 10px; border-radius: 0; font-size: 0.78rem; margin: 8px 0; }
   </style>
 </head>
 <body>
@@ -224,7 +226,7 @@ void LocoWebServer::setupRoutes() {
   </div>
 
   <!-- MODE EXPLANATION BANNER -->
-  <div id="modeBanner" style="background:rgba(0,210,255,0.08);border:1px solid rgba(0,210,255,0.25);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
+  <div id="modeBanner" style="background:rgba(0,85,191,0.1);border:1.5px solid rgba(0,85,191,0.35);border-radius:0;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
     <div id="modeBannerText">
       🕹️ <b>Manual Mode Active:</b> Direct throttle control via sliders. Master sends commands and failsafe stops motor on signal loss.
     </div>
@@ -604,12 +606,12 @@ void LocoWebServer::setupRoutes() {
       container.innerHTML = stations.map(st => {
         const sws = (st.switches && st.switches.length > 0) ? st.switches : [{ switchId: 1, gpioPin: 18, defaultPosition: 'STRAIGHT', description: 'Main Turnout' }];
         return `
-          <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;">
+          <div style="background:var(--card-alt);border:2px solid var(--border);border-radius:0;padding:10px 12px;margin-top:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <b>🚉 ${st.name || st.nodeId}</b> <code style="font-size:0.75rem;color:var(--primary);">${st.nodeId}</code>
             </div>
             ${sws.map((sw, swIdx) => `
-              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px 10px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0;padding:8px 10px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
                 <div>
                   <b style="color:var(--text);">Switch #${sw.switchId}</b>
                   <span class="status-badge" style="margin-left:6px;font-size:0.7rem;">GPIO ${sw.gpioPin}</span>
@@ -729,7 +731,7 @@ void LocoWebServer::setupRoutes() {
         const unpaired = nodes.filter(n => !n.isPaired && !n.isBondedOther);
         if (unpaired.length > 0) {
           unpList.innerHTML = unpaired.map(u => `
-            <div style="background:rgba(255,183,3,0.1);border:1px solid rgba(255,183,3,0.3);padding:8px 12px;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="background:rgba(254,209,0,0.1);border:1.5px solid rgba(254,209,0,0.3);padding:8px 12px;border-radius:0;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
               <div><b>${u.nodeType === 'LOCO' ? '🚂' : '🚉'} ${u.nodeId}</b> <span style="font-size:0.75rem;color:#8a99b5;">(${u.friendlyName || 'Ready Device'})</span></div>
               <button class="btn primary btn-sm" onclick="pairNode('${u.nodeId}')">🔗 Pair</button>
             </div>

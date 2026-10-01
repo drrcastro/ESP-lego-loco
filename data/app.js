@@ -330,7 +330,7 @@ function renderLocoCards(locos) {
     if (banner) banner.style.display = "block";
     if (unpList) {
       unpList.innerHTML = unpairedLocos.map(u => `
-        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 0; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
           <div>
             <strong style="color:var(--text); font-size: 0.95rem;">🚂 ${u.nodeId}</strong>
             <span style="font-size: 0.8rem; color: var(--text-dim); margin-left: 8px;">(${u.friendlyName || 'New Locomotive'}) &bull; RSSI: ${u.rssi || -50}dBm</span>
@@ -361,33 +361,34 @@ function renderLocoCards(locos) {
     }
 
     card.innerHTML = `
+      <div class="card-brick-studs studs-red"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <div class="card-header">
         <div class="card-title">
-          <span class="icon">🚂</span>
+          <span class="icon loco-avatar">🚂</span>
           <div>
             <h3>${loco.friendlyName || loco.nodeId}</h3>
             <span class="node-id">${loco.nodeId} &bull; ${loco.rssi || -50} dBm</span>
           </div>
         </div>
-        <span class="badge ${loco.isOnline ? 'badge-success' : 'badge-danger'}">
+        <span class="badge ${loco.isOnline ? 'badge-lego-green' : 'badge-lego-red'}">
           ${loco.isOnline ? 'ONLINE' : 'OFFLINE'}
         </span>
       </div>
 
       <div class="telemetry-bar">
-        <div class="telem-item">
+        <div class="telem-item telem-yellow">
           <span class="label">SPEED</span>
           <span class="value" id="valSpeed_${loco.nodeId}">${loco.speed || 0}%</span>
         </div>
-        <div class="telem-item">
+        <div class="telem-item telem-blue">
           <span class="label">BLOCK</span>
           <span class="value" id="valBlock_${loco.nodeId}">#${loco.currentBlock || 0}</span>
         </div>
-        <div class="telem-item">
+        <div class="telem-item telem-orange">
           <span class="label">LENGTH</span>
           <span class="value" id="valLength_${loco.nodeId}">${loco.measuredLengthCm || '--'} cm</span>
         </div>
-        <div class="telem-item">
+        <div class="telem-item telem-green">
           <span class="label">BATTERY</span>
           <span class="value" id="valBat_${loco.nodeId}">${((loco.batteryMv || 3800)/1000).toFixed(2)}V</span>
         </div>
@@ -395,23 +396,23 @@ function renderLocoCards(locos) {
 
       <div class="throttle-control">
         <div class="throttle-header">
-          <label>THROTTLE</label>
+          <label>THROTTLE (SPEED)</label>
           <span class="throttle-display" id="throttleVal_${loco.nodeId}">${loco.speed || 0}%</span>
         </div>
         <input type="range" min="-100" max="100" value="${loco.speed || 0}" step="5" class="throttle-slider" id="slider_${loco.nodeId}" oninput="onThrottleInput('${loco.nodeId}', this.value)">
         <div class="throttle-presets">
-          <button class="btn btn-secondary btn-sm" onclick="setLocoSpeed('${loco.nodeId}', -50)">REV 50%</button>
-          <button class="btn btn-danger btn-sm" onclick="setLocoSpeed('${loco.nodeId}', 0)">STOP</button>
-          <button class="btn btn-secondary btn-sm" onclick="setLocoSpeed('${loco.nodeId}', 50)">FWD 50%</button>
+          <button class="btn btn-lego-blue btn-sm" onclick="setLocoSpeed('${loco.nodeId}', -50)">REV 50%</button>
+          <button class="btn btn-lego-red btn-sm" onclick="setLocoSpeed('${loco.nodeId}', 0)">🛑 STOP</button>
+          <button class="btn btn-lego-green btn-sm" onclick="setLocoSpeed('${loco.nodeId}', 50)">FWD 50%</button>
         </div>
       </div>
 
       <div class="light-control-row">
-        <button class="btn btn-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'front')">💡 Front</button>
-        <button class="btn btn-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'cab')">💡 Cab</button>
-        <button class="btn btn-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'rear')">🚨 Rear</button>
-        <button class="btn btn-primary btn-sm" onclick="startLearningLap('${loco.nodeId}')">🚀 Learn</button>
-        <button class="btn btn-danger btn-sm" onclick="unpairLocomotive('${loco.nodeId}')" title="Unpair and release locomotive">🗑️ Unpair</button>
+        <button class="btn btn-lego-yellow-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'front')">💡 Front</button>
+        <button class="btn btn-lego-yellow-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'cab')">💡 Cab</button>
+        <button class="btn btn-lego-yellow-outline btn-sm" onclick="toggleLight('${loco.nodeId}', 'rear')">🚨 Rear</button>
+        <button class="btn btn-lego-green btn-sm" onclick="startLearningLap('${loco.nodeId}')">🚀 Learn</button>
+        <button class="btn btn-lego-red btn-sm" onclick="unpairLocomotive('${loco.nodeId}')" title="Unpair and release locomotive">🗑️ Unpair</button>
       </div>
     `;
   });
@@ -479,7 +480,7 @@ function renderTrackCards(tracks) {
     if (banner) banner.style.display = "block";
     if (unpList) {
       unpList.innerHTML = unpairedTracks.map(u => `
-        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,183,3,0.3); border-radius: 0; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
           <div>
             <strong style="color:var(--text); font-size: 0.95rem;">🚉 ${u.nodeId}</strong>
             <span style="font-size: 0.8rem; color: var(--text-dim); margin-left: 8px;">(${u.friendlyName || 'New Station'}) &bull; RSSI: ${u.rssi || -50}dBm</span>
@@ -518,33 +519,34 @@ function renderTrackCards(tracks) {
       : [{ switchId: 1, gpioPin: 18, defaultPosition: 'STRAIGHT', description: 'Main Turnout' }];
 
     card.innerHTML = `
+      <div class="card-brick-studs studs-blue"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <div class="card-header">
         <div class="card-title">
-          <span class="icon">🔀</span>
+          <span class="icon track-avatar">🔀</span>
           <div>
             <h3>${trk.friendlyName || trk.nodeId}</h3>
             <span class="node-id">${trk.nodeId} &bull; ${trk.rssi || -50} dBm</span>
           </div>
         </div>
-        <span class="badge ${trk.isOnline ? 'badge-success' : 'badge-danger'}">
+        <span class="badge ${trk.isOnline ? 'badge-lego-green' : 'badge-lego-red'}">
           ${trk.isOnline ? 'ONLINE' : 'OFFLINE'}
         </span>
       </div>
 
       <div class="telemetry-bar">
-        <div class="telem-item">
+        <div class="telem-item telem-blue">
           <span class="label">SWITCH</span>
           <span class="value ${isStraight ? 'text-accent' : 'text-warning'}" id="valSwitch_${trk.nodeId}">
             ${trk.switchState || 'STRAIGHT'}
           </span>
         </div>
-        <div class="telem-item">
+        <div class="telem-item telem-yellow">
           <span class="label">IR BEAM</span>
           <span class="value ${isOcc ? 'text-danger' : 'text-success'}" id="valBeam_${trk.nodeId}">
             ${isOcc ? 'OCCUPIED' : 'CLEAR'}
           </span>
         </div>
-        <div class="telem-item">
+        <div class="telem-item telem-orange">
           <span class="label">TRAIN LEN</span>
           <span class="value" id="valTrkLen_${trk.nodeId}">${trk.lastMeasuredLengthCm || '--'} cm</span>
         </div>
@@ -553,15 +555,15 @@ function renderTrackCards(tracks) {
       <div class="switches-container" style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:10px;">
         <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Turnout Switches (${swList.length})</span>
         ${swList.map((sw, swIdx) => `
-          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:8px 10px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius: 0; padding:10px 12px; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
             <div>
               <strong style="color:var(--text); font-size:0.88rem;">Switch #${sw.switchId}</strong>
-              <span class="badge" style="font-size:0.7rem; margin-left:6px; background:rgba(0,210,255,0.12); color:var(--primary);">GPIO ${sw.gpioPin}</span>
+              <span class="badge badge-lego-yellow" style="font-size:0.7rem; margin-left:6px;">GPIO ${sw.gpioPin}</span>
               <span style="font-size:0.78rem; color:var(--text-muted); margin-left:6px;">${sw.description || ''}</span>
             </div>
-            <div style="display:flex; gap:6px;">
-              <button class="btn btn-sm btn-outline" onclick="setTrackSwitch('${trk.nodeId}', 'STRAIGHT', ${swIdx})">➡️ Straight</button>
-              <button class="btn btn-sm btn-primary" onclick="setTrackSwitch('${trk.nodeId}', 'TURNOUT', ${swIdx})">🔀 Turnout</button>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-sm btn-lego-grey" onclick="setTrackSwitch('${trk.nodeId}', 'STRAIGHT', ${swIdx})">➡️ Straight</button>
+              <button class="btn btn-sm btn-lego-blue" onclick="setTrackSwitch('${trk.nodeId}', 'TURNOUT', ${swIdx})">🔀 Turnout</button>
             </div>
           </div>
         `).join("")}
@@ -878,7 +880,7 @@ function renderLocoConfigs(locos) {
 
   if (allLocos.length === 0) {
     container.innerHTML = `
-      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;text-align:center;color:var(--text-dim);">
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:0;padding:20px;text-align:center;color:var(--text-dim);">
         No locomotives discovered yet. Power on a locomotive and click <b>Scan for Locomotives</b>.
       </div>
     `;
@@ -891,7 +893,7 @@ function renderLocoConfigs(locos) {
         <h3 style="display:flex; align-items:center; gap:8px;">
           <span>🚂</span>
           <span>${loco.name || loco.nodeId}</span>
-          <code style="font-size:0.75rem; color:var(--text-muted); background:var(--bg-input); padding:2px 6px; border-radius:4px;">${loco.nodeId}</code>
+          <code style="font-size:0.75rem; color:var(--text-muted); background:var(--bg-input); padding:2px 6px; border-radius:0;">${loco.nodeId}</code>
         </h3>
         <div style="display:flex; gap:6px;">
           <button class="btn btn-sm btn-primary" onclick="startLearningLap('${loco.nodeId}')">🚀 Learning Lap</button>
@@ -1002,7 +1004,7 @@ function renderStationConfigs(stations) {
 
   if (allStations.length === 0) {
     container.innerHTML = `
-      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;text-align:center;color:var(--text-dim);">
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:0;padding:20px;text-align:center;color:var(--text-dim);">
         No stations discovered yet. Power on a track station and click <b>Scan for Stations</b>.
       </div>
     `;
@@ -1020,7 +1022,7 @@ function renderStationConfigs(stations) {
           <h3 style="display:flex; align-items:center; gap:8px;">
             <span>🚉</span>
             <span>${st.name || st.nodeId}</span>
-            <code style="font-size:0.75rem; color:var(--text-muted); background:var(--bg-input); padding:2px 6px; border-radius:4px;">${st.nodeId}</code>
+            <code style="font-size:0.75rem; color:var(--text-muted); background:var(--bg-input); padding:2px 6px; border-radius:0;">${st.nodeId}</code>
           </h3>
         </div>
 

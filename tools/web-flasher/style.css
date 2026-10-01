@@ -1,45 +1,102 @@
+/* =================================================================
+   LEGO® Loco - Web Firmware Flasher Design System
+   Thematic Design: Dark Baseplate, Tactile ABS Plastic Bricks,
+   Official LEGO Colors, Stud Relief & SHARP 90° BRICK EDGES (Arestas Vivas)
+   ================================================================= */
+
 :root {
-  --bg-dark: #090d16;
-  --bg-card: #121826;
-  --bg-panel: #161e31;
-  --bg-input: #0e1320;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(0, 210, 255, 0.4);
+  /* Official LEGO Iconic Palette */
+  --lego-red: #D11013;
+  --lego-red-hover: #E3000B;
+  --lego-red-shadow: #8A0B0E;
+  --lego-red-glow: rgba(209, 16, 19, 0.4);
 
-  --primary: #00d2ff;
-  --primary-glow: rgba(0, 210, 255, 0.3);
-  --accent: #3a86ff;
-  --success: #00f29b;
-  --warning: #ffb300;
-  --danger: #ff3366;
+  --lego-yellow: #FED100;
+  --lego-yellow-hover: #FFE033;
+  --lego-yellow-shadow: #B89200;
+  --lego-yellow-glow: rgba(254, 209, 0, 0.35);
 
-  --text-main: #f0f4fc;
-  --text-muted: #8a99b5;
-  --text-dim: #5c6a85;
+  --lego-blue: #0055BF;
+  --lego-blue-hover: #0066E6;
+  --lego-blue-shadow: #003B85;
+  --lego-blue-glow: rgba(0, 85, 191, 0.4);
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --font-sans: 'Outfit', sans-serif;
+  --lego-green: #00852B;
+  --lego-green-hover: #00A837;
+  --lego-green-shadow: #005C1E;
+  --lego-green-glow: rgba(0, 133, 43, 0.4);
+
+  --lego-orange: #FF7E14;
+  --lego-orange-shadow: #B85200;
+
+  /* Baseplate & Dark Theme Surfaces */
+  --lego-baseplate: #151821;
+  --lego-plate-card: #202532;
+  --lego-plate-card-hover: #262D3D;
+  --lego-plate-inner: #161922;
+  --lego-plate-input: #12141C;
+
+  /* LEGO Stone Grey Accents */
+  --lego-grey-stone: #555E70;
+  --lego-grey-light: #9DA6B8;
+  --lego-grey-dark: #2A303F;
+
+  /* Generic Mappings */
+  --bg-dark: var(--lego-baseplate);
+  --bg-card: var(--lego-plate-card);
+  --bg-panel: var(--lego-plate-card);
+  --bg-input: var(--lego-plate-input);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --border-active: var(--lego-yellow);
+
+  --primary: var(--lego-yellow);
+  --primary-glow: var(--lego-yellow-glow);
+  --accent: var(--lego-blue);
+  --success: var(--lego-green);
+  --warning: var(--lego-yellow);
+  --danger: var(--lego-red);
+
+  --text-main: #FFFFFF;
+  --text-muted: #A3AFBF;
+  --text-dim: #6B788E;
+
+  /* LEGO Bricks Have Sharp Straight Edges (Arestas Vivas) */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  --font-sans: 'Fredoka', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* LEGO Brick Rule: All structural containers, boxes, cards, buttons, badges, inputs have sharp 90-degree corners (Arestas Vivas) */
+div, section, article, header, nav, main, footer, aside,
+button, input, select, textarea,
+.panel, .btn, .badge, .form-select, .form-input, .form-file,
+.profile-card, .progress-box, .terminal-window, .progress-bar-bg,
+.modal, .toast, code, pre {
+  border-radius: 0 !important;
+}
+
 body {
-  background-color: var(--bg-dark);
+  background-color: var(--lego-baseplate);
   color: var(--text-main);
   font-family: var(--font-sans);
   min-height: 100vh;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem 3rem 1.5rem;
+  /* Authentic LEGO Dark Baseplate with 3D Embossed Studs Grid */
   background-image: 
-    radial-gradient(circle at 10% 10%, rgba(0, 210, 255, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 90%, rgba(58, 134, 255, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 30%, transparent 35%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.45) 32%, transparent 37%);
+  background-size: 32px 32px;
+  background-attachment: fixed;
 }
 
 .flasher-app {
@@ -47,100 +104,181 @@ body {
   margin: 0 auto;
 }
 
-/* Header */
-.header {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.75rem;
+/* =================================================================
+   LEGO Stud Elements (Cylindrical Pins on Flat Bricks)
+   ================================================================= */
+.stud, .card-brick-studs span {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.1) 40%, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.6) 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 -1px 2px rgba(0,0,0,0.4);
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* =================================================================
+   Header - Styled as a LEGO Modular Master Board (Sharp Corners)
+   ================================================================= */
+.header.lego-brick-header {
+  position: relative;
+  background: var(--lego-plate-card);
+  border: 2px solid var(--border-color);
+  border-radius: 0;
+  padding: 0;
   margin-bottom: 1.25rem;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.12), inset 0 -2px 0 rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.header-studs-strip {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 6px 12px;
+  background: #181D27;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header-studs-strip .stud {
+  width: 11px;
+  height: 11px;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 1rem 1.75rem;
+  gap: 1.25rem;
 }
 
+/* =================================================================
+   Authentic LEGO Logo Badge - Sharp Square
+   ================================================================= */
 .logo-area {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.logo-icon {
-  width: 44px;
-  height: 44px;
-  background: rgba(0, 210, 255, 0.1);
-  border: 1px solid var(--primary-glow);
-  border-radius: 12px;
+.lego-emblem {
+  background: var(--lego-red);
+  border: 3.5px solid var(--lego-yellow);
+  outline: 1.5px solid #000;
+  border-radius: 0;
+  width: 54px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -2px 0 rgba(0,0,0,0.3);
+  transform: rotate(-2deg);
+  transition: var(--transition);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.logo-icon svg {
-  width: 24px;
-  height: 24px;
+.lego-emblem:hover {
+  transform: rotate(0deg) scale(1.05);
 }
 
-.logo-area h1 {
-  font-size: 1.4rem;
+.lego-text {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 1.2rem;
+  color: #FFFFFF;
+  letter-spacing: -1px;
+  text-shadow: 
+    -1.5px -1.5px 0 #000,  
+     1.5px -1.5px 0 #000,
+    -1.5px  1.5px 0 #000,
+     1.5px  1.5px 0 #000,
+     3px 3px 0 #000;
+}
+
+.logo-title-group h1 {
+  font-size: 1.45rem;
   font-weight: 800;
   letter-spacing: 0.5px;
+  color: #FFFFFF;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 
-.logo-area h1 span {
-  color: var(--primary);
+.logo-title-group h1 span {
+  color: var(--lego-yellow);
 }
 
 .subtitle {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  font-size: 0.72rem;
+  color: var(--lego-grey-light);
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .browser-badge {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  background: var(--lego-plate-inner);
+  border: 1.5px solid var(--border-color);
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 0;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
 }
 
 .dot-online {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 8px var(--success);
+  background: var(--lego-green);
+  box-shadow: 0 0 10px var(--lego-green);
+  border: 1px solid rgba(255,255,255,0.4);
 }
 
-/* Info Banner */
-.info-banner {
-  background: rgba(0, 210, 255, 0.08);
-  border: 1px solid var(--primary-glow);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
+/* =================================================================
+   LEGO Instruction Info Banner (Sharp Edges)
+   ================================================================= */
+.info-banner.lego-alert-banner {
+  background: rgba(254, 209, 0, 0.08);
+  border: 2px dashed var(--lego-yellow);
+  border-radius: 0;
+  padding: 1rem 1.4rem;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 1.75rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 .info-icon {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+  color: var(--lego-yellow);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 }
 
 .info-text {
   font-size: 0.88rem;
-  color: #c9e6ff;
-  line-height: 1.4;
+  color: #F0F4FC;
+  line-height: 1.45;
+}
+
+.info-text strong {
+  color: var(--lego-yellow);
 }
 
 /* Section Title */
@@ -152,68 +290,126 @@ body {
 }
 
 .section-title h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 800;
 }
 
+/* =================================================================
+   LEGO Badges (Sharp Tiles)
+   ================================================================= */
 .badge {
-  font-size: 0.75rem;
-  background: rgba(0, 210, 255, 0.1);
-  color: var(--primary);
+  font-size: 0.74rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
   padding: 4px 10px;
-  border-radius: 20px;
-  font-weight: 600;
+  border-radius: 0;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-/* 3 Profile Cards */
+.badge-lego-yellow {
+  background: rgba(254, 209, 0, 0.18);
+  color: var(--lego-yellow);
+  border-color: var(--lego-yellow);
+}
+
+/* =================================================================
+   3 Firmware Profile Cards (LEGO Brick Modules - Sharp Corners)
+   ================================================================= */
 .profiles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 1.25rem;
+  gap: 1.35rem;
   margin-bottom: 2rem;
 }
 
 .profile-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  background: var(--lego-plate-card);
+  border: 2px solid var(--border-color);
+  border-radius: 0;
+  padding: 0 1.5rem 1.5rem 1.5rem;
   position: relative;
   display: flex;
   flex-direction: column;
   transition: var(--transition);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.12), inset 0 -2px 0 rgba(0,0,0,0.4);
+  overflow: hidden;
 }
 
 .profile-card:hover {
-  border-color: var(--border-active);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(0, 210, 255, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Top stud rows for profile cards */
+.card-brick-studs {
+  display: flex;
+  justify-content: space-around;
+  padding: 5px 8px;
+  margin: 0 -1.5rem 1.25rem -1.5rem;
+  background: #181D27;
+  border-bottom: 2px solid var(--brick-stud-accent, var(--lego-blue));
+}
+
+.card-brick-studs.studs-blue { --brick-stud-accent: var(--lego-blue); }
+.card-brick-studs.studs-red { --brick-stud-accent: var(--lego-red); }
+.card-brick-studs.studs-yellow { --brick-stud-accent: var(--lego-yellow); }
+
+.card-brick-studs span {
+  width: 11px;
+  height: 11px;
+}
+
+/* Specific Card Themes */
+.profile-card-blue {
+  border-top: 5px solid var(--lego-blue);
+}
+.profile-card-blue:hover {
+  border-color: var(--lego-blue);
+}
+
+.profile-card-red {
+  border-top: 5px solid var(--lego-red);
+}
+.profile-card-red:hover {
+  border-color: var(--lego-red);
+}
+
+.profile-card-yellow {
+  border-top: 5px solid var(--lego-yellow);
+}
+.profile-card-yellow:hover {
+  border-color: var(--lego-yellow);
 }
 
 .card-badge {
   position: absolute;
-  top: 1.25rem;
+  top: 2rem;
   right: 1.25rem;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 800;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   font-family: var(--font-mono);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
-.master-badge { background: rgba(58, 134, 255, 0.2); color: #3a86ff; }
-.loco-badge { background: rgba(0, 242, 155, 0.2); color: #00f29b; }
-.station-badge { background: rgba(255, 179, 0, 0.2); color: #ffb300; }
+.master-badge { background: rgba(0, 85, 191, 0.25); color: #8EC2FF; border: 1px solid var(--lego-blue); }
+.loco-badge { background: rgba(209, 16, 19, 0.25); color: #FFA3A5; border: 1px solid var(--lego-red); }
+.station-badge { background: rgba(254, 209, 0, 0.2); color: var(--lego-yellow); border: 1px solid var(--lego-yellow); }
 
 .card-icon {
   font-size: 2.2rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 }
 
 .profile-card h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+  color: #fff;
 }
 
 .card-desc {
@@ -223,7 +419,7 @@ body {
   margin-bottom: 1rem;
 }
 
-/* Chip Compatibility Tags */
+/* Chip Compatibility Tags (Styled like LEGO 1x1 flat tiles - Sharp) */
 .chip-compatibility {
   display: flex;
   flex-wrap: wrap;
@@ -234,26 +430,31 @@ body {
 .chip-tag {
   font-size: 0.72rem;
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: 800;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-.chip-tag.esp32 { background: rgba(0, 210, 255, 0.15); color: #00d2ff; }
-.chip-tag.esp32s3 { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-.chip-tag.esp32c3 { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.chip-tag.esp8266 { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.chip-tag.esp32 { background: rgba(0, 85, 191, 0.25); color: #8EC2FF; border-color: var(--lego-blue); }
+.chip-tag.esp32s3 { background: rgba(168, 85, 247, 0.25); color: #d8b4fe; border-color: #a855f7; }
+.chip-tag.esp32c3 { background: rgba(0, 133, 43, 0.25); color: #8EE6A8; border-color: var(--lego-green); }
+.chip-tag.esp8266 { background: rgba(255, 126, 20, 0.25); color: #fed7aa; border-color: var(--lego-orange); }
 
 .features-list {
   list-style: none;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: var(--text-muted);
   margin-bottom: 1.5rem;
   flex: 1;
 }
 
 .features-list li {
-  margin-bottom: 5px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .install-action {
@@ -262,13 +463,20 @@ body {
   gap: 8px;
 }
 
-/* Advanced Panel */
+/* =================================================================
+   Advanced Panel & Form Controls (Sharp Edges)
+   ================================================================= */
 .advanced-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  background: var(--lego-plate-card);
+  border: 2px solid var(--border-color);
+  border-radius: 0;
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255, 255, 255, 0.12), inset 0 -2px 0 rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.panel-studs-strip {
+  margin: 0 -1.5rem 1rem -1.5rem;
 }
 
 .panel-header {
@@ -281,13 +489,14 @@ body {
 }
 
 .panel-header h2 {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
 .panel-sub {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .port-controls {
@@ -301,34 +510,41 @@ body {
   gap: 1.5rem;
 }
 
-/* Forms */
+/* Form inputs */
 .form-group {
   margin-bottom: 1rem;
 }
 
 .form-group label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .form-select, .form-input, .form-file {
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  background: var(--lego-plate-input);
+  border: 1.5px solid var(--border-color);
   color: #fff;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  border-radius: 0;
   font-family: var(--font-sans);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  transition: var(--transition);
+}
+
+.form-select:focus, .form-input:focus {
+  outline: none;
+  border-color: var(--lego-yellow);
+  box-shadow: 0 0 0 2px var(--lego-yellow-glow);
 }
 
 .form-select optgroup {
-  background: var(--bg-card);
-  color: var(--primary);
-  font-weight: 700;
+  background: var(--lego-plate-card);
+  color: var(--lego-yellow);
+  font-weight: 800;
 }
 
 .field-hint {
@@ -340,12 +556,15 @@ body {
 
 .form-check {
   margin-bottom: 1.25rem;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
 }
 
 .form-check input {
-  margin-right: 6px;
+  margin-right: 8px;
+  accent-color: var(--lego-red);
 }
 
 .flash-actions {
@@ -354,37 +573,43 @@ body {
 
 /* Progress Box */
 .progress-box {
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 0.75rem;
+  background: var(--lego-plate-inner);
+  border: 1.5px solid var(--border-color);
+  border-radius: 0;
+  padding: 0.85rem;
   margin-top: 1rem;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
 }
 
 .progress-label {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 800;
   font-family: var(--font-mono);
   margin-bottom: 6px;
+  color: var(--lego-yellow);
 }
 
 .progress-bar-bg {
   width: 100%;
-  height: 8px;
+  height: 10px;
   background: rgba(255,255,255,0.06);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00d2ff, #00f29b);
-  box-shadow: 0 0 10px var(--primary-glow);
+  background: linear-gradient(90deg, var(--lego-yellow), var(--lego-green));
+  box-shadow: 0 0 10px var(--lego-green-glow);
   transition: width 0.15s ease;
 }
 
-/* Terminal Side */
+/* =================================================================
+   Serial Terminal Monitor (Sharp Edges)
+   ================================================================= */
 .terminal-side {
   display: flex;
   flex-direction: column;
@@ -394,8 +619,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.76rem;
+  font-weight: 800;
   font-family: var(--font-mono);
   color: var(--text-dim);
   margin-bottom: 6px;
@@ -409,14 +634,15 @@ body {
 .terminal-window {
   flex: 1;
   min-height: 380px;
-  background: #060911;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  background: #0B0E14;
+  border: 1.5px solid var(--border-color);
+  border-radius: 0;
   padding: 1rem;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.6;
   overflow-y: auto;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 .term-line {
@@ -424,65 +650,121 @@ body {
   word-break: break-all;
 }
 
-.term-line.system { color: var(--primary); }
-.term-line.out { color: #a0aec0; }
-.term-line.err { color: var(--danger); }
-.term-line.success { color: var(--success); font-weight: 700; }
+.term-line.system { color: #8EC2FF; }
+.term-line.out { color: #A0AEC0; }
+.term-line.err { color: #FFA3A5; font-weight: 700; }
+.term-line.success { color: #8EE6A8; font-weight: 800; }
 
-/* Buttons */
+/* =================================================================
+   LEGO 3D Buttons (Sharp Rectangular ABS Tiles with Bevel Edge)
+   ================================================================= */
 .btn {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--lego-grey-stone);
   color: #fff;
-  padding: 10px 16px;
-  font-size: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 9px 16px;
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
   font-weight: 700;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
-  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4), inset 0 1.5px 0 rgba(255, 255, 255, 0.25), inset 0 -1.5px 0 rgba(0,0,0,0.3);
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
 .btn:hover:not(:disabled) {
-  background: rgba(255,255,255,0.1);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4), inset 0 1.5px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #00d2ff, #0072ff);
-  border: none;
-  box-shadow: 0 4px 14px var(--primary-glow);
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(0, 210, 255, 0.45);
-}
-
-.btn-secondary {
-  background: var(--bg-input);
-  color: var(--text-muted);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border-color);
+  box-shadow: none;
 }
 
 .btn-sm {
-  padding: 4px 10px;
-  font-size: 0.75rem;
+  padding: 5px 12px;
+  font-size: 0.78rem;
 }
 
 .btn-block {
   width: 100%;
 }
 
+/* Color Brick Button Variations */
+.btn-primary, .btn-lego-blue {
+  background: var(--lego-blue);
+  box-shadow: 0 3px 0 var(--lego-blue-shadow), inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-primary:active, .btn-lego-blue:active {
+  box-shadow: 0 1px 0 var(--lego-blue-shadow);
+}
+
+.btn-danger, .btn-lego-red {
+  background: var(--lego-red);
+  box-shadow: 0 3px 0 var(--lego-red-shadow), inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-danger:active, .btn-lego-red:active {
+  box-shadow: 0 1px 0 var(--lego-red-shadow);
+}
+
+.btn-success, .btn-lego-green {
+  background: var(--lego-green);
+  box-shadow: 0 3px 0 var(--lego-green-shadow), inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-success:active, .btn-lego-green:active {
+  box-shadow: 0 1px 0 var(--lego-green-shadow);
+}
+
+.btn-warning, .btn-lego-yellow {
+  background: var(--lego-yellow);
+  color: #111317;
+  box-shadow: 0 3px 0 var(--lego-yellow-shadow), inset 0 1.5px 0 rgba(255, 255, 255, 0.5);
+}
+.btn-warning:active, .btn-lego-yellow:active {
+  box-shadow: 0 1px 0 var(--lego-yellow-shadow);
+}
+
+.btn-secondary, .btn-lego-grey {
+  background: #3B4252;
+  box-shadow: 0 3px 0 #212631, inset 0 1.5px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-outline, .btn-lego-yellow-outline {
+  background: rgba(254, 209, 0, 0.08);
+  border: 1.5px solid var(--lego-yellow);
+  color: var(--lego-yellow);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+}
+
+.btn-outline:hover, .btn-lego-yellow-outline:hover {
+  background: var(--lego-yellow);
+  color: #111;
+}
+
 @media (max-width: 960px) {
   .advanced-grid {
     grid-template-columns: 1fr;
+  }
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .header-right-actions {
+    justify-content: space-between;
   }
 }

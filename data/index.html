@@ -5,116 +5,153 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#090d16">
-  <title>Lego Loco Control Center</title>
+  <meta name="theme-color" content="#151821">
+  <title>LEGO® Loco - Train Dispatch &amp; Traffic Command</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-container">
-    <!-- Top Header -->
-    <header class="header">
-      <div class="header-left">
-        <div class="logo-badge">
-          <svg class="train-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="3" width="16" height="16" rx="2"></rect>
-            <path d="M4 11h16"></path>
-            <path d="M12 3v8"></path>
-            <path d="m8 19-2 3"></path>
-            <path d="m16 19 2 3"></path>
-            <circle cx="8" cy="15" r="1"></circle>
-            <circle cx="16" cy="15" r="1"></circle>
-          </svg>
-          <div>
-            <h1>LEGO LOCO</h1>
-            <p class="subtitle">AUTONOMOUS DISPATCH &amp; TRAFFIC REGULATION</p>
+    <!-- Top Header with LEGO Brand Styling -->
+    <header class="header lego-brick-header">
+      <div class="header-studs-strip">
+        <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+        <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+        <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+        <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+      </div>
+
+      <div class="header-main-row">
+        <div class="header-left">
+          <div class="lego-logo-badge">
+            <div class="lego-emblem">
+              <span class="lego-text">LEGO</span>
+            </div>
+            <div class="logo-title-group">
+              <h1>LOCO <span>CONTROL</span></h1>
+              <p class="subtitle">AUTONOMOUS DISPATCH &amp; TRAFFIC REGULATION</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="header-center">
-        <div class="mode-selector">
-          <button id="btnModeManual" class="mode-btn active" onclick="setSystemMode('MANUAL')">
-            <span class="dot"></span> MANUAL
-          </button>
-          <button id="btnModeAuto" class="mode-btn" onclick="setSystemMode('AUTOMATIC')">
-            <span class="dot"></span> AUTONOMOUS
+        <div class="header-center">
+          <div class="mode-selector lego-mode-selector">
+            <button id="btnModeManual" class="mode-btn mode-btn-manual active" onclick="setSystemMode('MANUAL')">
+              <span class="brick-pip"></span> MANUAL
+            </button>
+            <button id="btnModeAuto" class="mode-btn mode-btn-auto" onclick="setSystemMode('AUTOMATIC')">
+              <span class="brick-pip"></span> AUTONOMOUS
+            </button>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="ws-status" id="wsStatus">
+            <span class="status-indicator pulse-offline" id="wsIndicator"></span>
+            <span id="wsStatusText">CONNECTING</span>
+          </div>
+          <button id="btnEmergencyStop" class="btn-emergency lego-estop" onclick="triggerEmergencyStop()" title="Emergency Stop All Trains">
+            <span class="estop-oct">🛑</span>
+            <span>E-STOP</span>
           </button>
         </div>
-      </div>
-
-      <div class="header-right">
-        <div class="ws-status" id="wsStatus">
-          <span class="status-indicator pulse-offline" id="wsIndicator"></span>
-          <span id="wsStatusText">CONNECTING</span>
-        </div>
-        <button id="btnEmergencyStop" class="btn-emergency" onclick="triggerEmergencyStop()" title="Emergency Stop All Trains">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          <span>E-STOP</span>
-        </button>
       </div>
     </header>
 
     <!-- Mobile Quick Bar -->
     <div class="mobile-quick-ribbon">
-      <div class="mode-selector-mobile">
+      <div class="mode-selector-mobile lego-mode-selector">
         <button class="mode-btn-mobile active" id="mBtnManual" onclick="setSystemMode('MANUAL')">MANUAL</button>
         <button class="mode-btn-mobile" id="mBtnAuto" onclick="setSystemMode('AUTOMATIC')">AUTO</button>
       </div>
-      <button class="btn-emergency-mobile" onclick="triggerEmergencyStop()">
+      <button class="btn-emergency-mobile lego-estop" onclick="triggerEmergencyStop()">
         🛑 STOP ALL
       </button>
     </div>
 
-    <!-- System Stats Ribbon -->
+    <!-- System Stats Ribbon (4 LEGO Colored Bricks) -->
     <div class="stats-ribbon">
-      <div class="stat-card">
-        <span class="stat-label">Active Locomotives</span>
-        <span class="stat-value" id="statLocoCount">0</span>
+      <div class="stat-card stat-brick-red">
+        <div class="brick-top-studs">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="stat-inner">
+          <span class="stat-icon">🚂</span>
+          <div>
+            <span class="stat-label">Active Locomotives</span>
+            <span class="stat-value" id="statLocoCount">0</span>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-label">Track Infrastructure</span>
-        <span class="stat-value" id="statTrackCount">0</span>
+      <div class="stat-card stat-brick-blue">
+        <div class="brick-top-studs">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="stat-inner">
+          <span class="stat-icon">🔀</span>
+          <div>
+            <span class="stat-label">Track Switches</span>
+            <span class="stat-value" id="statTrackCount">0</span>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-label">Circuit Topology</span>
-        <span class="stat-value text-accent" id="statCircuitStatus">Ready</span>
+      <div class="stat-card stat-brick-yellow">
+        <div class="brick-top-studs">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="stat-inner">
+          <span class="stat-icon">🗺️</span>
+          <div>
+            <span class="stat-label">Circuit Topology</span>
+            <span class="stat-value" id="statCircuitStatus">Ready</span>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-label">System Uptime</span>
-        <span class="stat-value" id="statUptime">00:00:00</span>
+      <div class="stat-card stat-brick-green">
+        <div class="brick-top-studs">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="stat-inner">
+          <span class="stat-icon">⏱️</span>
+          <div>
+            <span class="stat-label">System Uptime</span>
+            <span class="stat-value" id="statUptime">00:00:00</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Navigation Tabs (Desktop & Tablet) -->
-    <nav class="nav-tabs" id="desktopNavTabs">
-      <button class="nav-tab active" data-tab="tabLocos" onclick="switchTab('tabLocos')">
+    <!-- Navigation Tabs (LEGO Colored Plate Tabs) -->
+    <nav class="nav-tabs lego-nav-tabs" id="desktopNavTabs">
+      <button class="nav-tab tab-red active" data-tab="tabLocos" onclick="switchTab('tabLocos')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="16" rx="2"></rect><line x1="4" y1="11" x2="20" y2="11"></line></svg>
         Locomotives
       </button>
-      <button class="nav-tab" data-tab="tabTrack" onclick="switchTab('tabTrack')">
+      <button class="nav-tab tab-blue" data-tab="tabTrack" onclick="switchTab('tabTrack')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v18"></path><path d="M18 3v18"></path><path d="m6 8 12 8"></path><path d="M3 5h6"></path><path d="M15 5h6"></path><path d="M3 19h6"></path><path d="M15 19h6"></path></svg>
         Track &amp; Stations
       </button>
-      <button class="nav-tab" data-tab="tabMap" onclick="switchTab('tabMap')">
+      <button class="nav-tab tab-yellow" data-tab="tabMap" onclick="switchTab('tabMap')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
         Circuit Map (CTC)
       </button>
-      <button class="nav-tab" data-tab="tabConfig" onclick="switchTab('tabConfig')">
+      <button class="nav-tab tab-grey" data-tab="tabConfig" onclick="switchTab('tabConfig')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         Advanced Config
       </button>
-      <button class="nav-tab" data-tab="tabNodes" onclick="switchTab('tabNodes')">
+      <button class="nav-tab tab-cyan" data-tab="tabNodes" onclick="switchTab('tabNodes')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
         Fleet Discovery
       </button>
-      <button class="nav-tab" data-tab="tabLogs" onclick="switchTab('tabLogs')">
+      <button class="nav-tab tab-green" data-tab="tabLogs" onclick="switchTab('tabLogs')">
+        <span class="tab-brick-dot"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
         Event Telemetry
       </button>
@@ -122,10 +159,36 @@
 
     <!-- TAB 1: LOCOMOTIVES -->
     <main id="tabLocos" class="tab-content active">
+      <!-- LEGO Hero Showcase Banner -->
+      <div class="lego-hero-banner">
+        <div class="hero-image-wrap">
+          <img src="lego_train_hero.jpg" alt="LEGO Train Depot" class="hero-image">
+          <div class="hero-gradient-overlay"></div>
+        </div>
+        <div class="hero-content">
+          <div class="hero-brick-tag">
+            <span class="tag-stud"></span> LEGO® TRAINS DISPATCH
+          </div>
+          <h2>Central Station &amp; Locomotive Command</h2>
+          <p>Real-time wireless throttle, headlights, and anti-collision spacing across your LEGO layout.</p>
+          <div class="hero-btn-row">
+            <button class="btn btn-lego-red" onclick="scanFleet()">
+              🔍 Scan for Locomotives
+            </button>
+            <button class="btn btn-lego-yellow" onclick="switchTab('tabMap')">
+              🗺️ CTC Circuit Map
+            </button>
+            <button class="btn btn-lego-green" onclick="startLearningLap('ALL')">
+              🚀 Fleet Discovery Lap
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="section-header">
         <div>
           <h2>Train Fleet Control</h2>
-          <span class="badge">Real-time Throttle &amp; Lights</span>
+          <span class="badge badge-lego-yellow">Real-time Throttle &amp; Lights</span>
         </div>
         <button class="btn btn-primary btn-sm" id="btnScanFleetTop" onclick="scanFleet()">
           🔍 Scan for Locomotives
@@ -133,35 +196,56 @@
       </div>
 
       <!-- Pairing & Discovery Banner for Unpaired Locos -->
-      <div id="unpairedFleetBanner" style="display:none; margin-bottom: 16px; background: rgba(255,183,3,0.06); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 14px;">
+      <div id="unpairedFleetBanner" class="lego-alert-banner" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <h3 style="font-size:0.95rem; color:var(--warning); display:flex; align-items:center; gap:6px; margin:0;">
+          <h3 style="font-size:0.95rem; color:var(--lego-yellow); display:flex; align-items:center; gap:6px; margin:0;">
             ⚠️ New Locomotives Detected (Unpaired)
           </h3>
-          <span class="badge" style="background:rgba(255,183,3,0.15); color:var(--warning);">Ready to Pair</span>
+          <span class="badge badge-lego-yellow">Ready to Pair</span>
         </div>
-        <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:10px;">
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">
           These locomotives were detected on the radio channel but are not bonded to this Master Gateway. Click <b>Pair to this Master</b> to associate.
         </p>
         <div id="unpairedFleetList"></div>
       </div>
 
       <div id="locoGrid" class="cards-grid">
-        <div class="empty-state" id="locoEmptyState">
-          <div style="max-width: 480px; margin: 0 auto; text-align: center;">
-            <div style="font-size: 2.5rem; margin-bottom: 10px;">🚂</div>
-            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No Locomotive Paired</h3>
-            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
-              To control a locomotive, it must be <b>bonded</b> to this Master Gateway to prevent interference with other train layouts.
-            </p>
-            <div style="background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 12px; text-align: left; font-size: 0.8rem; margin-bottom: 16px; line-height: 1.6;">
-              <b>Pairing Procedure:</b><br>
-              1. Power on the locomotive (LED pulses gently in standby mode).<br>
-              2. Click the <b>"Scan for Locomotives"</b> button below.<br>
-              3. When the locomotive appears, click <b>"Pair to this Master"</b>.<br>
-              🔒 <i>Note: Once bonded, the locomotive responds exclusively to this Master. To reset / switch Master, re-flash firmware with Erase Flash.</i>
+        <div class="empty-state lego-instruction-card" id="locoEmptyState">
+          <div class="instruction-header">
+            <div class="instruction-studs"><span></span><span></span><span></span><span></span></div>
+            <div class="instruction-title-bar">
+              <span class="instruction-badge">LEGO® INSTRUCTIONS</span>
+              <h3>No Locomotive Paired Yet</h3>
             </div>
-            <button class="btn btn-primary" onclick="scanFleet()">
+          </div>
+          <div class="instruction-body">
+            <p class="instruction-intro">
+              Bond your train locomotive to this Master Gateway to begin autonomous speed and optical beacon control.
+            </p>
+            <div class="instruction-steps">
+              <div class="instruction-step">
+                <span class="step-num step-num-red">1</span>
+                <div>
+                  <strong>Power On Locomotive</strong>
+                  <p>Turn on battery power. The onboard LED pulses gently in standby mode.</p>
+                </div>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num step-num-yellow">2</span>
+                <div>
+                  <strong>Scan Radio Channel</strong>
+                  <p>Click "Scan for Locomotives" to discover active ESP-NOW beacons.</p>
+                </div>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num step-num-green">3</span>
+                <div>
+                  <strong>Pair &amp; Command</strong>
+                  <p>Click "Pair to this Master". The locomotive bonds exclusively to your layout!</p>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-lego-red" style="margin-top:16px;" onclick="scanFleet()">
               🔍 Scan for Locomotives
             </button>
           </div>
@@ -174,7 +258,7 @@
       <div class="section-header">
         <div>
           <h2>Track Switches &amp; Station Infrastructure</h2>
-          <span class="badge">Servos, IR Beams &amp; Dwell Timers</span>
+          <span class="badge badge-lego-blue">Servos, IR Beams &amp; Dwell Timers</span>
         </div>
         <button class="btn btn-primary btn-sm" onclick="scanFleet()">
           🔍 Scan for Stations &amp; Infrastructure
@@ -182,35 +266,56 @@
       </div>
 
       <!-- Pairing & Discovery Banner for Unpaired Track Stations -->
-      <div id="unpairedTrackBanner" style="display:none; margin-bottom: 16px; background: rgba(255,183,3,0.06); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 14px;">
+      <div id="unpairedTrackBanner" class="lego-alert-banner" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <h3 style="font-size:0.95rem; color:var(--warning); display:flex; align-items:center; gap:6px; margin:0;">
+          <h3 style="font-size:0.95rem; color:var(--lego-yellow); display:flex; align-items:center; gap:6px; margin:0;">
             ⚠️ New Stations / Turnouts Detected (Unpaired)
           </h3>
-          <span class="badge" style="background:rgba(255,183,3,0.15); color:var(--warning);">Ready to Pair</span>
+          <span class="badge badge-lego-yellow">Ready to Pair</span>
         </div>
-        <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:10px;">
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">
           These stations were detected on the radio channel but are not bonded to this Master Gateway. Click <b>Pair to this Master</b> to associate.
         </p>
         <div id="unpairedTrackList"></div>
       </div>
 
       <div id="trackGrid" class="cards-grid">
-        <div class="empty-state" id="trackEmptyState">
-          <div style="max-width: 480px; margin: 0 auto; text-align: center;">
-            <div style="font-size: 2.5rem; margin-bottom: 10px;">🚉</div>
-            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No Station Paired</h3>
-            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
-              To control turnouts and signals, stations must be <b>bonded</b> to this Master to prevent other layouts from actuating your track switches.
-            </p>
-            <div style="background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 12px; text-align: left; font-size: 0.8rem; margin-bottom: 16px; line-height: 1.6;">
-              <b>Station Pairing Procedure:</b><br>
-              1. Power on the station node (OLED display shows <i>UNPAIRED / AWAITING PAIRING</i>).<br>
-              2. Click the <b>"Scan for Stations"</b> button.<br>
-              3. Click <b>"Pair to this Master"</b>.<br>
-              🔒 <i>Note: Once bonded, the station responds exclusively to this Master. To reset / switch Master, re-flash firmware with Erase Flash.</i>
+        <div class="empty-state lego-instruction-card" id="trackEmptyState">
+          <div class="instruction-header">
+            <div class="instruction-studs"><span></span><span></span><span></span><span></span></div>
+            <div class="instruction-title-bar">
+              <span class="instruction-badge">LEGO® INSTRUCTIONS</span>
+              <h3>No Track Switch or Station Paired</h3>
             </div>
-            <button class="btn btn-primary" onclick="scanFleet()">
+          </div>
+          <div class="instruction-body">
+            <p class="instruction-intro">
+              Control turnouts, optical localizer beams, and station platform stops safely from this central dispatcher.
+            </p>
+            <div class="instruction-steps">
+              <div class="instruction-step">
+                <span class="step-num step-num-blue">1</span>
+                <div>
+                  <strong>Power On Track Node</strong>
+                  <p>OLED display shows <i>UNPAIRED / AWAITING PAIRING</i>.</p>
+                </div>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num step-num-yellow">2</span>
+                <div>
+                  <strong>Scan for Stations</strong>
+                  <p>Broadcast discovery packet to locate new ESP32 track turnouts.</p>
+                </div>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num step-num-green">3</span>
+                <div>
+                  <strong>Bond Station Node</strong>
+                  <p>Click "Pair to this Master" to associate servos and signals.</p>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-lego-blue" style="margin-top:16px;" onclick="scanFleet()">
               🔍 Scan for Stations
             </button>
           </div>
