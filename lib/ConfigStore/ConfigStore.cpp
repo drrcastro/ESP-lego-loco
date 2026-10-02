@@ -31,7 +31,16 @@ bool ConfigStore::begin() {
         saveUnifiedConfig();
     }
 
-    loadNodeMappings();
+    if (!loadNodeMappings()) {
+        saveNodeMappings();
+    }
+
+    // Ensure default topology exists if missing
+    if (!LittleFS.exists(TOPOLOGY_PATH)) {
+        const char* defTopo = R"({"isCalibrated":false,"totalLapTimeMs":0,"nodes":[{"id":10,"type":"BEACON","role":"ROLE_APPROACH","label":"West Approach"},{"id":11,"type":"STATION","role":"ROLE_STATION_ARRIVAL","label":"Platform 1"},{"id":12,"type":"BEACON","role":"ROLE_DEPARTURE","label":"East Exit"},{"id":15,"type":"BEACON","role":"ROLE_SIDING","label":"Passing Siding"},{"id":20,"type":"BEACON","role":"ROLE_LOCATOR","label":"South Sector"}],"edges":[{"from":10,"to":11,"transitTimeMs":4200,"isTurnoutBranch":false},{"from":10,"to":15,"transitTimeMs":4600,"isTurnoutBranch":true},{"from":11,"to":12,"transitTimeMs":3800,"isTurnoutBranch":false},{"from":15,"to":12,"transitTimeMs":4100,"isTurnoutBranch":false},{"from":12,"to":20,"transitTimeMs":6200,"isTurnoutBranch":false},{"from":20,"to":10,"transitTimeMs":5900,"isTurnoutBranch":false}]})";
+        saveTopologyJson(defTopo);
+    }
+
     return true;
 }
 

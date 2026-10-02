@@ -69,6 +69,7 @@ def merge_bin_action(source, target, env):
 
         cmd_args.extend([app_offset, target_firmware])
 
+
         print(f"[Web Flasher] Generating merged binary for {env_name} ({mcu})...")
 
         python_exe = env.subst("$PYTHONEXE") or sys.executable

@@ -111,66 +111,163 @@ void LocoWebServer::handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     }
 }
 
-void LocoWebServer::setupRoutes() {
-    // LittleFS static files
-    _server.serveStatic("/style.css", LittleFS, "/style.css");
-    _server.serveStatic("/app.js", LittleFS, "/app.js");
-    _server.serveStatic("/favicon.ico", LittleFS, "/favicon.ico");
-
-    _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (LittleFS.exists("/index.html")) {
-            request->send(LittleFS, "/index.html", "text/html");
-            return;
-        }
-
-        // Complete mobile-friendly embedded controller with 3-tab Advanced Configuration Studio
-        const char* fallbackHtml = R"rawliteral(
+// Complete self-contained embedded LEGO Controller (served 100% from Flash PROGMEM via AsyncProgmemResponse)
+static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#090d16">
-  <title>Lego Loco Controller</title>
+  <meta name="theme-color" content="#151821">
+  <title>LEGO Loco - Control Center</title>
   <style>
     :root {
       --bg: #151821; --card: #202532; --card-alt: #181D27; --input: #12141C;
       --primary: #FED100; --success: #00852B; --danger: #D11013; --warning: #FED100; --accent: #0055BF;
       --text: #ffffff; --text-dim: #A3AFBF; --border: rgba(255,255,255,0.12);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 12px; min-height: 100vh; padding-bottom: 50px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; border-radius: 0 !important; }
     
-    /* Header - Sharp LEGO Tile */
-    .header { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; border: 2px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
-    .header h1 { font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
-    .header h1 span { color: var(--primary); }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 12px;
+      min-height: 100vh;
+      padding-bottom: 50px;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 30%, transparent 35%),
+        radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.45) 32%, transparent 37%);
+      background-size: 32px 32px;
+      background-attachment: fixed;
+    }
+
+    /* LEGO Studs & Indicator LEDs remain circular */
+    .stud, .stat-top-studs span, .slider::-webkit-slider-thumb {
+      border-radius: 50% !important;
+    }
+
+    .stud, .stat-top-studs span {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.1) 40%, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.6) 100%);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .stud-strip {
+      display: flex;
+      justify-content: space-around;
+      padding: 4px 8px;
+      background: #181D27;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    /* Header - LEGO Emblem Board */
+    .header {
+      background: var(--card);
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      margin-bottom: 12px;
+    }
+    .header-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .lego-emblem {
+      background: #D11013;
+      border: 3px solid #FED100;
+      outline: 1.5px solid #000;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.35);
+      transform: rotate(-2deg);
+      flex-shrink: 0;
+    }
+    .lego-text {
+      font-weight: 900;
+      font-style: italic;
+      font-size: 1rem;
+      color: #FFFFFF;
+      letter-spacing: -1px;
+      text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 2px 2px 0 #000;
+    }
+    .header-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-title-wrap h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    .header-title-wrap h1 span { color: var(--primary); }
     .header-right { display: flex; align-items: center; gap: 8px; }
-    .status-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 0; background: rgba(0,133,43,0.25); color: #8EE6A8; font-weight: 800; border: 1px solid var(--success); }
+    .status-badge { font-size: 0.72rem; padding: 4px 10px; background: rgba(0,133,43,0.25); color: #8EE6A8; font-weight: 800; border: 1px solid var(--success); }
     .status-badge.offline { background: rgba(209,16,19,0.25); color: #FFA3A5; border-color: var(--danger); }
+
+    /* 4 LEGO Brick Stat Cards */
+    .stats-ribbon {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .stat-brick-red { border-top: 4px solid var(--danger); }
+    .stat-brick-blue { border-top: 4px solid var(--accent); }
+    .stat-brick-yellow { border-top: 4px solid var(--warning); }
+    .stat-brick-green { border-top: 4px solid var(--success); }
+    .stat-top-studs {
+      display: flex;
+      justify-content: space-around;
+      padding: 3px 6px;
+      background: rgba(0,0,0,0.25);
+    }
+    .stat-body {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+    }
+    .stat-icon { font-size: 1.4rem; }
+    .stat-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); display: block; }
+    .stat-val { font-size: 1.3rem; font-weight: 800; color: #fff; font-family: monospace; }
     
     /* Emergency Bar - LEGO Brick Red Button */
     .estop-bar { margin-bottom: 12px; }
-    .btn-estop { width: 100%; background: linear-gradient(180deg, #E3000B 0%, #D11013 100%); border: 2px solid #FFA3A5; outline: 2px solid #8A0B0E; color: #fff; padding: 13px; font-size: 1.1rem; font-weight: 800; border-radius: 0; cursor: pointer; box-shadow: 0 4px 0 #8A0B0E, 0 6px 16px rgba(209,16,19,0.4); }
+    .btn-estop { width: 100%; background: linear-gradient(180deg, #E3000B 0%, #D11013 100%); border: 2px solid #FFA3A5; outline: 2px solid #8A0B0E; color: #fff; padding: 13px; font-size: 1.1rem; font-weight: 800; cursor: pointer; box-shadow: 0 4px 0 #8A0B0E, 0 6px 16px rgba(209,16,19,0.4); }
     .btn-estop:active { transform: translateY(3px); box-shadow: 0 1px 0 #8A0B0E; }
     
     /* Nav Tabs - Sharp Brick Plates */
-    .nav-tabs { display: flex; gap: 4px; background: var(--card); padding: 4px; border-radius: 0; margin-bottom: 14px; border: 2px solid var(--border); overflow-x: auto; }
-    .nav-btn { flex: 1; min-width: 80px; background: transparent; border: none; color: var(--text-dim); padding: 9px 12px; font-size: 0.85rem; font-weight: 700; border-radius: 0; cursor: pointer; transition: all 0.2s; white-space: nowrap; text-align: center; }
+    .nav-tabs { display: flex; gap: 4px; background: var(--card); padding: 4px; margin-bottom: 14px; border: 2px solid var(--border); overflow-x: auto; }
+    .nav-btn { flex: 1; min-width: 80px; background: transparent; border: none; color: var(--text-dim); padding: 9px 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; text-align: center; }
     .nav-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #003B85; font-weight: 800; }
     .tab-content { display: none; }
     .tab-content.active { display: block; animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Cards - Sharp Rectangular Bricks */
-    .card { background: var(--card); border: 2px solid var(--border); border-radius: 0; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+    .card { background: var(--card); border: 2px solid var(--border); padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
     .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-desc { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4; }
     
     /* Forms - Sharp Inputs */
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
-    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1.5px solid var(--border); padding: 9px 12px; border-radius: 0; font-size: 0.9rem; }
+    .form-control { width: 100%; background: var(--input); color: var(--text); border: 1.5px solid var(--border); padding: 9px 12px; font-size: 0.9rem; }
     .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(254,209,0,0.3); }
     .field-hint { display: block; font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
     
@@ -181,10 +278,10 @@ void LocoWebServer::setupRoutes() {
     .throttle-box { margin: 14px 0; }
     .speed-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
     .speed-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
-    .slider { width: 100%; height: 16px; border-radius: 0; background: var(--input); -webkit-appearance: none; outline: none; border: 1.5px solid var(--border); }
-    .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFF3A8 0%, #FED100 70%, #B89200 100%); border: 2px solid #fff; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
+    .slider { width: 100%; height: 16px; background: var(--input); -webkit-appearance: none; outline: none; border: 1.5px solid var(--border); }
+    .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; background: radial-gradient(circle at 35% 30%, #FFF3A8 0%, #FED100 70%, #B89200 100%); border: 2px solid #fff; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
-    .btn { background: #374151; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; border-radius: 0; cursor: pointer; text-align: center; box-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+    .btn { background: #374151; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; cursor: pointer; text-align: center; box-shadow: 0 3px 0 rgba(0,0,0,0.4); }
     .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
     .btn.primary { background: var(--accent); color: #fff; font-weight: 800; border: none; box-shadow: 0 3px 0 #003B85; }
     .btn.stop { background: var(--danger); color: #fff; border-color: rgba(255,255,255,0.2); box-shadow: 0 3px 0 #8A0B0E; }
@@ -193,40 +290,96 @@ void LocoWebServer::setupRoutes() {
     
     /* Config Subtabs */
     .subtabs-bar { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 14px; padding-bottom: 8px; }
-    .subtab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; padding: 7px 14px; border-radius: 0; cursor: pointer; }
+    .subtab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; padding: 7px 14px; cursor: pointer; }
     .subtab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #003B85; }
     .subtab-pane { display: none; }
     .subtab-pane.active { display: block; }
     
     /* Tables */
-    .table-box { width: 100%; overflow-x: auto; margin-top: 10px; border: 1.5px solid var(--border); border-radius: 0; }
+    .table-box { width: 100%; overflow-x: auto; margin-top: 10px; border: 1.5px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
     th { background: rgba(255,255,255,0.06); color: var(--primary); padding: 8px 10px; text-align: left; border-bottom: 1.5px solid var(--border); font-weight: 800; }
     td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-    .input-sm { background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 0; font-size: 0.8rem; width: 100%; }
+    .input-sm { background: var(--input); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; font-size: 0.8rem; width: 100%; }
     
-    .mode-toggle-group { display: flex; background: var(--input); padding: 3px; border-radius: 0; border: 1.5px solid var(--border); }
-    .mode-btn-top { background: transparent; border: none; color: var(--text-dim); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 0; cursor: pointer; transition: all 0.2s; }
+    .mode-toggle-group { display: flex; background: var(--input); padding: 3px; border: 1.5px solid var(--border); }
+    .mode-btn-top { background: transparent; border: none; color: var(--text-dim); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
     .mode-btn-top.active { background: var(--primary); color: #000; font-weight: 800; box-shadow: 0 2px 0 #B89200; }
     .notice { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }
-    .notice-warn { background: rgba(254,209,0,0.12); color: var(--warning); border: 1.5px dashed var(--warning); padding: 8px 10px; border-radius: 0; font-size: 0.78rem; margin: 8px 0; }
+    .notice-warn { background: rgba(254,209,0,0.12); color: var(--warning); border: 1.5px dashed var(--warning); padding: 8px 10px; font-size: 0.78rem; margin: 8px 0; }
   </style>
 </head>
 <body>
   <!-- HEADER -->
   <div class="header">
-    <h1>🚂 LEGO LOCO</h1>
-    <div class="header-right">
-      <div class="mode-toggle-group">
-        <button class="mode-btn-top active" id="btnModeMan" onclick="setSystemMode('MANUAL')">🕹️ MANUAL</button>
-        <button class="mode-btn-top" id="btnModeAuto" onclick="setSystemMode('AUTONOMOUS')">🤖 AUTONOMOUS</button>
+    <div class="stud-strip">
+      <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+      <span class="stud"></span><span class="stud"></span><span class="stud"></span><span class="stud"></span>
+    </div>
+    <div class="header-main">
+      <div class="header-title-wrap">
+        <div class="lego-emblem"><span class="lego-text">LEGO</span></div>
+        <div>
+          <h1>LOCO <span>CONTROL CENTER</span></h1>
+          <p style="font-size:0.7rem;color:var(--text-dim);font-weight:700;">ESP-NOW DISPATCH GATEWAY</p>
+        </div>
       </div>
-      <span class="status-badge" id="wsBadge">LIVE WS</span>
+      <div class="header-right">
+        <div class="mode-toggle-group">
+          <button class="mode-btn-top active" id="btnModeMan" onclick="setSystemMode('MANUAL')">🕹️ MANUAL</button>
+          <button class="mode-btn-top" id="btnModeAuto" onclick="setSystemMode('AUTONOMOUS')">🤖 AUTONOMOUS</button>
+        </div>
+        <span class="status-badge" id="wsBadge">LIVE WS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 LEGO STAT CARDS -->
+  <div class="stats-ribbon">
+    <div class="stat-card stat-brick-red">
+      <div class="stat-top-studs"><span></span><span></span><span></span><span></span></div>
+      <div class="stat-body">
+        <div class="stat-icon">🚂</div>
+        <div>
+          <span class="stat-label">Active Locos</span>
+          <span class="stat-val" id="statLocosCount">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card stat-brick-blue">
+      <div class="stat-top-studs"><span></span><span></span><span></span><span></span></div>
+      <div class="stat-body">
+        <div class="stat-icon">🔀</div>
+        <div>
+          <span class="stat-label">Track Switches</span>
+          <span class="stat-val" id="statSwitchesCount">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card stat-brick-yellow">
+      <div class="stat-top-studs"><span></span><span></span><span></span><span></span></div>
+      <div class="stat-body">
+        <div class="stat-icon">⏱️</div>
+        <div>
+          <span class="stat-label">Safety Headway</span>
+          <span class="stat-val" id="statHeadwayVal">12s</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card stat-brick-green">
+      <div class="stat-top-studs"><span></span><span></span><span></span><span></span></div>
+      <div class="stat-body">
+        <div class="stat-icon">📡</div>
+        <div>
+          <span class="stat-label">ESP-NOW Fleet</span>
+          <span class="stat-val" id="statFleetCount">0</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- MODE EXPLANATION BANNER -->
-  <div id="modeBanner" style="background:rgba(0,85,191,0.1);border:1.5px solid rgba(0,85,191,0.35);border-radius:0;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
+  <div id="modeBanner" style="background:rgba(0,85,191,0.1);border:1.5px solid rgba(0,85,191,0.35);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
     <div id="modeBannerText">
       🕹️ <b>Manual Mode Active:</b> Direct throttle control via sliders. Master sends commands and failsafe stops motor on signal loss.
     </div>
@@ -754,6 +907,16 @@ void LocoWebServer::setupRoutes() {
             </tr>
           `).join('');
         }
+
+        // Update stats ribbon
+        const locos = nodes.filter(n => n.nodeType === 'LOCO');
+        const swCount = (systemConfig.stations || []).reduce((acc, s) => acc + (s.switches ? s.switches.length : 1), 0);
+        const elL = document.getElementById('statLocosCount');
+        const elS = document.getElementById('statSwitchesCount');
+        const elF = document.getElementById('statFleetCount');
+        if (elL) elL.textContent = locos.length;
+        if (elS) elS.textContent = swCount;
+        if (elF) elF.textContent = nodes.length;
       } catch(e) {}
     }
 
@@ -775,6 +938,9 @@ void LocoWebServer::setupRoutes() {
       document.getElementById('cfgSafeSec').value = sys.headwaySafeSec || 12;
       document.getElementById('cfgCautionSec').value = sys.headwayCautionSec || 6;
       document.getElementById('cfgTrimPct').value = sys.headwaySpeedTrimPct || 40;
+
+      const elH = document.getElementById('statHeadwayVal');
+      if (elH) elH.textContent = (sys.headwaySafeSec || 12) + 's';
 
       // 2. Render Locomotives
       renderLocosConfig();
@@ -1205,8 +1371,27 @@ void LocoWebServer::setupRoutes() {
 </body>
 </html>
 )rawliteral";
-        request->send(200, "text/html", fallbackHtml);
+
+void LocoWebServer::setupRoutes() {
+    // Favicon handler from memory (no LittleFS lookup, zero 404/vfs errors)
+    _server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(204);
     });
+
+    // In-memory dummy handlers for legacy/cached assets (zero LittleFS lookups)
+    _server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "text/css", "");
+    });
+    _server.on("/app.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "application/javascript", "");
+    });
+
+    // Stream main interface directly from PROGMEM (zero RAM allocation, no heap fragmentation)
+    auto serveHtml = [](AsyncWebServerRequest *request) {
+        request->send(200, "text/html", (const uint8_t*)INDEX_HTML, sizeof(INDEX_HTML) - 1);
+    };
+    _server.on("/", HTTP_GET, serveHtml);
+    _server.on("/index.html", HTTP_GET, serveHtml);
 
 
     // API: System Status
@@ -1469,14 +1654,6 @@ void LocoWebServer::setupRoutes() {
     _server.on("/canonical.html", HTTP_GET, redirectToRoot);
     _server.on("/connecttest.txt", HTTP_GET, redirectToRoot);
     _server.on("/ncsi.txt", HTTP_GET, redirectToRoot);
-
-    _server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (LittleFS.exists("/index.html")) {
-            request->send(LittleFS, "/index.html", "text/html");
-            return;
-        }
-        request->redirect("http://192.168.4.1/");
-    });
 
     _server.onNotFound([](AsyncWebServerRequest *request) {
         String host = request->host();
